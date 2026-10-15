@@ -11,14 +11,19 @@ import {
   Send,
   LogOut,
   Radio,
+  UploadCloud,
 } from 'lucide-react';
 import { ALL_BLOOD_GROUPS } from '../../store/selectors';
+import { SmartInventoryImportPage } from '../inventory/SmartInventoryImportPage';
+import { NearExpiryRescuePage } from '../nearexpiry/NearExpiryRescuePage';
 
 export const BloodBankDashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const { state, mutate } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'REQUESTS' | 'TRANSFERS'>('INVENTORY');
+  const [activeTab, setActiveTab] = useState<
+    'INVENTORY' | 'REQUESTS' | 'TRANSFERS' | 'SMART_IMPORT' | 'NEAR_EXPIRY'
+  >('INVENTORY');
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
   const bankId = user?.orgId || 'ORG-BANK-01';
@@ -332,6 +337,30 @@ export const BloodBankDashboardPage: React.FC = () => {
               {activeReservations.length + transfers.length}
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('SMART_IMPORT')}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+              activeTab === 'SMART_IMPORT'
+                ? 'border-[#0F2E5A] text-[#0F2E5A] bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Smart Ingestion (CSV / OCR)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('NEAR_EXPIRY')}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+              activeTab === 'NEAR_EXPIRY'
+                ? 'border-[#0F2E5A] text-[#0F2E5A] bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-red-500" />
+            <span>Near-Expiry Rescue Alerts</span>
+          </button>
         </div>
 
         {/* TAB 1: INVENTORY MATRIX */}
@@ -587,6 +616,20 @@ export const BloodBankDashboardPage: React.FC = () => {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {/* TAB 4: SMART INVENTORY IMPORT (CSV / EXCEL / OCR) */}
+        {activeTab === 'SMART_IMPORT' && (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6">
+            <SmartInventoryImportPage />
+          </div>
+        )}
+
+        {/* TAB 5: NEAR-EXPIRY RESCUE ALERTS */}
+        {activeTab === 'NEAR_EXPIRY' && (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6">
+            <NearExpiryRescuePage />
           </div>
         )}
       </main>

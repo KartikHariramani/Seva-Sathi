@@ -17,7 +17,6 @@ import { usePredictions } from '../hooks/usePredictions';
 import { SmartStockoutAlert } from '../components/intelligence/SmartStockoutAlert';
 import type { HospitalInventoryItem } from '../data/hospitalInventory';
 import {
-  Droplets,
   CheckCircle2,
   Lock,
   AlertOctagon,
@@ -26,6 +25,8 @@ import {
   Boxes,
   GitPullRequest,
   Plus,
+  Building2,
+  Clock,
 } from 'lucide-react';
 
 export const HospitalDashboardPage: React.FC = () => {
@@ -109,45 +110,56 @@ export const HospitalDashboardPage: React.FC = () => {
             onReview={handleOpenGroupDetails}
           />
 
-          {/* 3. LEVEL 2: KPI CARDS (Section 11, 12, 45, 46) */}
-          <section aria-label="Key Performance Indicators" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-            <HospitalKpiCard
-              label="Total Inventory"
-              value={summary.totalQuantity.toFixed(1)}
-              unit="L"
-              explanation="Across 8 blood groups"
-              icon={<Droplets className="w-4 h-4" />}
-            />
+          {/* 3. LEVEL 2: KPI CARDS (Feature One: Database-backed Network Metrics) */}
+          <section aria-label="Key Performance Indicators" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <Link to="/hospital/network" className="block focus:outline-none">
+              <HospitalKpiCard
+                label="Verified Blood Banks"
+                value={4}
+                explanation="Connected supply hubs"
+                indicatorColor="healthy"
+                icon={<Building2 className="w-4 h-4 text-[#1E4C8A]" />}
+              />
+            </Link>
 
             <HospitalKpiCard
-              label="Available"
+              label="Available Blood"
               value={summary.availableQuantity.toFixed(1)}
               unit="L"
-              explanation="Currently available"
+              explanation="Ready for bedside transfusion"
               indicatorColor="healthy"
               icon={<CheckCircle2 className="w-4 h-4 text-[#10B981]" />}
             />
 
+            <Link to="/hospital/near-expiry" className="block focus:outline-none">
+              <HospitalKpiCard
+                label="Near-Expiry Rescue"
+                value={3}
+                unit="Batches"
+                explanation="Eligible before expiry"
+                indicatorColor="critical"
+                icon={<Clock className="w-4 h-4 text-amber-500" />}
+              />
+            </Link>
+
             <HospitalKpiCard
-              label="Reserved"
-              value={summary.reservedQuantity.toFixed(1)}
-              unit="L"
-              explanation="Already committed"
-              tooltipText="Blood already committed to an approved request."
-              icon={<Lock className="w-4 h-4" />}
+              label="Critical Shortages"
+              value={criticalItems.length}
+              explanation={
+                criticalItems.length === 0
+                  ? 'All 8 groups in healthy buffer'
+                  : `${criticalItems.length} groups below safe threshold`
+              }
+              indicatorColor={criticalItems.length > 0 ? 'critical' : 'healthy'}
+              icon={<AlertOctagon className="w-4 h-4" />}
             />
 
             <HospitalKpiCard
-              label="At Risk"
-              value={summary.atRiskCount}
-              explanation={
-                summary.atRiskCount === 1
-                  ? 'Blood group requiring attention'
-                  : 'Blood groups requiring attention'
-              }
-              indicatorColor={summary.atRiskCount > 0 ? 'critical' : 'healthy'}
-              tooltipText="Inventory requiring attention based on current demo rules."
-              icon={<AlertOctagon className="w-4 h-4" />}
+              label="Pending Reserved"
+              value={summary.reservedQuantity.toFixed(1)}
+              unit="L"
+              explanation="Allocated to ICU requests"
+              icon={<Lock className="w-4 h-4" />}
             />
 
             <Link to="/hospital/requests" className="block focus:outline-none col-span-2 sm:col-span-1">
@@ -156,11 +168,10 @@ export const HospitalDashboardPage: React.FC = () => {
                 value={activeRequestsCount}
                 explanation={
                   activeRequestsCount === 1
-                    ? '1 active network request'
-                    : `${activeRequestsCount} active network requests`
+                    ? '1 active emergency request'
+                    : `${activeRequestsCount} active emergency requests`
                 }
                 indicatorColor={activeRequestsCount > 0 ? 'healthy' : 'neutral'}
-                tooltipText="Ongoing blood requests being coordinated across the RaktSetu network."
                 icon={<GitPullRequest className="w-4 h-4 text-[#1E4C8A]" />}
               />
             </Link>

@@ -8,7 +8,6 @@ import { Layout } from './components/layout/Layout';
 // Public Pages
 import { LandingPage } from './pages/LandingPage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
-import { NetworkPage } from './pages/NetworkPage';
 import { AboutPage } from './pages/AboutPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -49,12 +48,18 @@ import { AdminAlertsPage } from './pages/admin/AdminAlertsPage';
 import { AdminActivityPage } from './pages/admin/AdminActivityPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 
-// Hospital Staff & Blood Bank Pages & Guards
 import { HospitalStaffPage } from './pages/hospital/HospitalStaffPage';
 import { HospitalStaffDashboardPage } from './pages/hospital/HospitalStaffDashboardPage';
 import { BloodBankDashboardPage } from './pages/bloodbank/BloodBankDashboardPage';
 import { BloodBankRouteGuard } from './components/bloodbank/BloodBankRouteGuard';
 import { HospitalRegisterPage } from './pages/hospital/HospitalRegisterPage';
+import { HospitalLayout } from './components/hospital/HospitalLayout';
+
+// Seva Sathi Modules
+import { NearExpiryRescuePage } from './pages/nearexpiry/NearExpiryRescuePage';
+import { SmartInventoryImportPage } from './pages/inventory/SmartInventoryImportPage';
+import { LiveInventoryNetworkPage } from './pages/network/LiveInventoryNetworkPage';
+import { DonorPortalPage } from './pages/donor/DonorPortalPage';
 
 export function App() {
   return (
@@ -71,6 +76,36 @@ export function App() {
                   element={
                     <HospitalRouteGuard>
                       <HospitalDashboardPage />
+                    </HospitalRouteGuard>
+                  }
+                />
+                <Route
+                  path="/hospital/network"
+                  element={
+                    <HospitalRouteGuard>
+                      <HospitalLayout pageTitle="Live Blood-Bank Network">
+                        <LiveInventoryNetworkPage />
+                      </HospitalLayout>
+                    </HospitalRouteGuard>
+                  }
+                />
+                <Route
+                  path="/hospital/near-expiry"
+                  element={
+                    <HospitalRouteGuard>
+                      <HospitalLayout pageTitle="Near-Expiry Blood Rescue">
+                        <NearExpiryRescuePage />
+                      </HospitalLayout>
+                    </HospitalRouteGuard>
+                  }
+                />
+                <Route
+                  path="/hospital/inventory/import"
+                  element={
+                    <HospitalRouteGuard>
+                      <HospitalLayout pageTitle="Smart Inventory Import">
+                        <SmartInventoryImportPage />
+                      </HospitalLayout>
                     </HospitalRouteGuard>
                   }
                 />
@@ -278,7 +313,37 @@ export function App() {
                 path="/network"
                 element={
                   <Layout>
-                    <NetworkPage />
+                    <LiveInventoryNetworkPage />
+                  </Layout>
+                }
+              />
+              <Route
+                path="/near-expiry"
+                element={
+                  <Layout>
+                    <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                      <NearExpiryRescuePage />
+                    </div>
+                  </Layout>
+                }
+              />
+              <Route
+                path="/donor/portal"
+                element={
+                  <Layout>
+                    <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                      <DonorPortalPage />
+                    </div>
+                  </Layout>
+                }
+              />
+              <Route
+                path="/inventory/import"
+                element={
+                  <Layout>
+                    <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                      <SmartInventoryImportPage />
+                    </div>
                   </Layout>
                 }
               />

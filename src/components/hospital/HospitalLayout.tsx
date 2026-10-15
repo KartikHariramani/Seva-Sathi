@@ -18,6 +18,10 @@ import {
   CheckCircle2,
   Bell,
   Users,
+  Globe,
+  Clock,
+  UploadCloud,
+  Heart,
 } from 'lucide-react';
 
 interface HospitalLayoutProps {
@@ -46,6 +50,27 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
       icon: LayoutDashboard,
       enabled: true,
     },
+    {
+      label: 'Live Network',
+      path: '/hospital/network',
+      icon: Globe,
+      enabled: true,
+      activeMatch: (pathname: string) => pathname.startsWith('/hospital/network'),
+    },
+    {
+      label: 'Near-Expiry Rescue',
+      path: '/hospital/near-expiry',
+      icon: Clock,
+      enabled: true,
+      activeMatch: (pathname: string) => pathname.startsWith('/hospital/near-expiry'),
+    },
+    {
+      label: 'Smart Import',
+      path: '/hospital/inventory/import',
+      icon: UploadCloud,
+      enabled: true,
+      activeMatch: (pathname: string) => pathname.startsWith('/hospital/inventory/import'),
+    },
     { label: 'Inventory', path: '/hospital/inventory', icon: Boxes, enabled: true },
     {
       label: 'Record Issue',
@@ -61,6 +86,13 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
       enabled: true,
       count: activeRequestsCount,
       activeMatch: (pathname: string) => pathname.startsWith('/hospital/requests'),
+    },
+    {
+      label: 'Donor Network',
+      path: '/donor/portal',
+      icon: Heart,
+      enabled: true,
+      activeMatch: (pathname: string) => pathname.startsWith('/donor'),
     },
     {
       label: 'Predictions',
@@ -124,9 +156,12 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
                 <circle cx="12" cy="14" r="2" fill="#FFFFFF" />
               </svg>
             </div>
-            <span className="font-poppins font-bold text-lg tracking-tight text-[#0F172A]">
-              RaktSetu
-            </span>
+            <div className="flex flex-col">
+              <span className="font-poppins font-bold text-lg tracking-tight text-[#0F172A] leading-tight flex items-center gap-1.5">
+                Seva Sathi
+              </span>
+              <span className="text-[10px] font-mono text-[#1E4C8A]">Coordination Hub</span>
+            </div>
           </Link>
 
           {/* Navigation Items (Section 6) */}
@@ -231,7 +266,7 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
               />
             </svg>
           </div>
-          <span className="font-poppins font-bold text-base text-[#0F172A]">RaktSetu</span>
+          <span className="font-poppins font-bold text-base text-[#0F172A]">Seva Sathi</span>
         </Link>
 
         <div className="flex items-center gap-3">

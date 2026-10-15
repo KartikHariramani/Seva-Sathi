@@ -29,7 +29,9 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { label: 'How It Works', path: '/how-it-works' },
-    { label: 'Network', path: '/network' },
+    { label: 'Live Network', path: '/network' },
+    { label: 'Near-Expiry Rescue', path: '/near-expiry' },
+    { label: 'Donor Hub', path: '/donor/portal' },
     { label: 'About', path: '/about' },
   ];
 
@@ -71,9 +73,9 @@ export const Navbar: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-poppins font-bold text-lg tracking-tight text-[#0F172A] leading-tight flex items-center gap-1.5">
-                RaktSetu
+                Seva Sathi
                 <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 text-[#1E4C8A] bg-blue-50 border border-blue-200/60 rounded">
-                  2.0
+                  Healthcare
                 </span>
               </span>
             </div>
