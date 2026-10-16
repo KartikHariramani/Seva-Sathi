@@ -116,7 +116,7 @@ export const HospitalRegisterPage: React.FC = () => {
               <Building2 className="w-4 h-4 text-white" />
             </div>
             <span className="font-poppins font-bold text-xl text-[#0F172A] tracking-tight">
-              RaktSetu
+              SevaSetu
             </span>
           </Link>
 

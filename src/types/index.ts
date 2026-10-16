@@ -1,8 +1,8 @@
 export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 
-export type OrganizationType = 'hospital' | 'blood_bank';
+export type OrganizationType = 'hospital' | 'blood_bank' | 'ngo';
 
-export type UserRole = 'hospital' | 'blood_bank' | 'admin' | 'hospital_staff' | 'donor';
+export type UserRole = 'hospital' | 'blood_bank' | 'admin' | 'hospital_staff' | 'donor' | 'ngo';
 
 export interface OrganizationRegistrationData {
   organizationType: OrganizationType;
@@ -68,3 +68,5 @@ export * from './bloodRequest';
 export * from './nearExpiry';
 export * from './inventoryImport';
 export * from './donor';
+export * from './campaign';
+export * from './alert';

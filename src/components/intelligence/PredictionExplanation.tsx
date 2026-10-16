@@ -94,7 +94,7 @@ export const PredictionExplanation: React.FC<PredictionExplanationProps> = ({ pr
       <div className="mt-4 pt-4 border-t border-slate-100 bg-slate-900 text-slate-100 rounded-xl p-4 sm:p-5 space-y-3 font-sans">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-rose-400">
           <ShieldAlert className="w-4 h-4 text-rose-400" />
-          <span>RaktSetu Trust &amp; Governance Verification</span>
+          <span>SevaSetu Trust &amp; Governance Verification</span>
         </div>
 
         <div className="space-y-3 text-xs">
@@ -125,7 +125,7 @@ export const PredictionExplanation: React.FC<PredictionExplanationProps> = ({ pr
               3. "What happens next?"
             </p>
             <p className="text-slate-300 leading-relaxed">
-              Hospital personnel remain in full command. In Phase 5, RaktSetu will generate proactive replenishment recommendations for supervisory approval to balance hospital reserves before stockouts manifest.
+              Hospital personnel remain in full command. In Phase 5, SevaSetu will generate proactive replenishment recommendations for supervisory approval to balance hospital reserves before stockouts manifest.
             </p>
           </div>
         </div>

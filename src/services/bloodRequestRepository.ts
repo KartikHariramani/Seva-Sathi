@@ -5,6 +5,12 @@ import type {
 } from '../types/bloodRequest';
 import { INITIAL_HOSPITAL_REQUESTS } from '../data/hospitalRequests';
 import { generateRequestId } from '../utils/requestId';
+import {
+  validateAndSanitizeServerDeadline,
+  sortRequestsByDispatchQueue,
+} from '../utils/urgencyPolicy';
+import { syncEngine } from '../sync/broadcastSync';
+import { storageAdapter } from '../persistence/localStorageAdapter';
 
 const REQUESTS_STORAGE_KEY = 'raktsetu_hospital_requests_v2';
 const DRAFT_STORAGE_KEY = 'raktsetu_hospital_request_draft_v2';
@@ -12,6 +18,7 @@ const DRAFT_STORAGE_KEY = 'raktsetu_hospital_request_draft_v2';
 export interface BloodRequestRepository {
   getRequests(): Promise<BloodRequest[]>;
   getRequest(id: string): Promise<BloodRequest | null>;
+  getDispatchQueue(): Promise<BloodRequest[]>;
   createRequest(
     data: CreateBloodRequestInput,
     hospitalContext?: {
@@ -30,11 +37,17 @@ export interface BloodRequestRepository {
 }
 
 class MockBloodRequestRepository implements BloodRequestRepository {
+  private memoryStore: BloodRequest[] | null = null;
+
   private getStoredRequests(): BloodRequest[] {
     try {
-      const stored = localStorage.getItem(REQUESTS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(REQUESTS_STORAGE_KEY);
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } else if (this.memoryStore) {
+        return this.memoryStore;
       }
     } catch (e) {
       console.error('Failed to parse stored requests from localStorage', e);
@@ -46,7 +59,10 @@ class MockBloodRequestRepository implements BloodRequestRepository {
 
   private saveRequests(requests: BloodRequest[]): void {
     try {
-      localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(requests));
+      this.memoryStore = requests;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(requests));
+      }
     } catch (e) {
       console.error('Failed to save requests to localStorage', e);
     }
@@ -59,7 +75,7 @@ class MockBloodRequestRepository implements BloodRequestRepository {
 
   async getRequests(): Promise<BloodRequest[]> {
     await this.delay(180);
-    return this.getStoredRequests();
+    return sortRequestsByDispatchQueue(this.getStoredRequests());
   }
 
   async getRequest(id: string): Promise<BloodRequest | null> {
@@ -70,6 +86,11 @@ class MockBloodRequestRepository implements BloodRequestRepository {
       (r) => r.id === id || r.displayId.toLowerCase() === id.toLowerCase()
     );
     return found || null;
+  }
+
+  async getDispatchQueue(): Promise<BloodRequest[]> {
+    await this.delay(150);
+    return sortRequestsByDispatchQueue(this.getStoredRequests());
   }
 
   async createRequest(
@@ -87,6 +108,14 @@ class MockBloodRequestRepository implements BloodRequestRepository {
     const nowIso = now.toISOString();
     const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    // Server-side enforcement: Never trust a deadline supplied only by the frontend
+    const serverDeadlineCheck = validateAndSanitizeServerDeadline(
+      data.priority,
+      data.requiredBy,
+      now
+    );
+    const verifiedRequiredBy = serverDeadlineCheck.requiredBy;
+
     const displayId = generateRequestId();
     const internalId = `req-${Date.now()}`;
     const initialStatus = data.status || 'pending_approval';
@@ -96,11 +125,25 @@ class MockBloodRequestRepository implements BloodRequestRepository {
       requestId: internalId,
       type: 'created',
       title: initialStatus === 'draft' ? 'Draft request saved' : 'Request submitted for review',
-      description: `${data.quantityLitres.toFixed(1)} L of ${data.bloodGroup} requested (${data.priority.toUpperCase()}).`,
+      description: `${data.quantityLitres.toFixed(1)} L of ${data.bloodGroup} requested (${data.priority.toUpperCase()}). Deadline: ${new Date(verifiedRequiredBy).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
       timestamp: nowIso,
       timeFormatted,
       actor: hospitalContext?.submittedBy || 'Hospital Admin',
     };
+
+    const newActivities: BloodRequestActivity[] = [initialActivity];
+    if (serverDeadlineCheck.recalculated && serverDeadlineCheck.reason) {
+      newActivities.push({
+        id: `act-${Date.now()}-recalc`,
+        requestId: internalId,
+        type: 'status_change',
+        title: 'Emergency Deadline Calibrated',
+        description: serverDeadlineCheck.reason,
+        timestamp: nowIso,
+        timeFormatted,
+        actor: 'Seva Sathi Automated Policy Engine',
+      });
+    }
 
     const newRequest: BloodRequest = {
       id: internalId,
@@ -115,16 +158,35 @@ class MockBloodRequestRepository implements BloodRequestRepository {
       quantityLitres: Number(data.quantityLitres),
       priority: data.priority,
       status: initialStatus,
-      requiredBy: data.requiredBy,
+      requiredBy: verifiedRequiredBy,
       reason: data.reason || '',
       createdAt: nowIso,
       updatedAt: nowIso,
       submittedBy: hospitalContext?.submittedBy || 'Hospital Admin',
-      activities: [initialActivity],
+      activities: newActivities,
     };
 
-    const updated = [newRequest, ...requests];
+    const updated = sortRequestsByDispatchQueue([newRequest, ...requests]);
     this.saveRequests(updated);
+
+    // Keep canonical state synchronized for cross-dashboard visibility (Blood Banks & Admin)
+    try {
+      const canonicalState = storageAdapter.getState();
+      const existingIdx = canonicalState.requests.findIndex(
+        (r) => r.id === newRequest.id || r.displayId === newRequest.displayId
+      );
+      if (existingIdx >= 0) {
+        canonicalState.requests[existingIdx] = newRequest;
+      } else {
+        canonicalState.requests.unshift(newRequest);
+      }
+      canonicalState.stateVersion = (canonicalState.stateVersion || 100) + 1;
+      storageAdapter.saveState(canonicalState);
+    } catch {
+      // safe fallback
+    }
+
+    syncEngine.broadcast('REQUEST_CREATED', Date.now(), { request: newRequest }, 'REQUEST', newRequest.id);
 
     // If draft was cleared after submission
     if (initialStatus !== 'draft') {
@@ -170,6 +232,25 @@ class MockBloodRequestRepository implements BloodRequestRepository {
 
     requests[index] = updatedItem;
     this.saveRequests(requests);
+
+    try {
+      const canonicalState = storageAdapter.getState();
+      const existingIdx = canonicalState.requests.findIndex(
+        (r) => r.id === updatedItem.id || r.displayId === updatedItem.displayId
+      );
+      if (existingIdx >= 0) {
+        canonicalState.requests[existingIdx] = updatedItem;
+      } else {
+        canonicalState.requests.unshift(updatedItem);
+      }
+      canonicalState.stateVersion = (canonicalState.stateVersion || 100) + 1;
+      storageAdapter.saveState(canonicalState);
+    } catch {
+      // safe fallback
+    }
+
+    syncEngine.broadcast('REQUEST_UPDATED', Date.now(), { request: updatedItem }, 'REQUEST', updatedItem.id);
+
     return updatedItem;
   }
 
@@ -206,13 +287,32 @@ class MockBloodRequestRepository implements BloodRequestRepository {
 
     requests[index] = cancelledItem;
     this.saveRequests(requests);
+
+    try {
+      const canonicalState = storageAdapter.getState();
+      const existingIdx = canonicalState.requests.findIndex(
+        (r) => r.id === cancelledItem.id || r.displayId === cancelledItem.displayId
+      );
+      if (existingIdx >= 0) {
+        canonicalState.requests[existingIdx] = cancelledItem;
+        canonicalState.stateVersion = (canonicalState.stateVersion || 100) + 1;
+        storageAdapter.saveState(canonicalState);
+      }
+    } catch {
+      // safe fallback
+    }
+
+    syncEngine.broadcast('REQUEST_UPDATED', Date.now(), { request: cancelledItem }, 'REQUEST', cancelledItem.id);
+
     return cancelledItem;
   }
 
   async saveDraft(data: Partial<CreateBloodRequestInput>): Promise<void> {
     await this.delay(100);
     try {
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(data));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(data));
+      }
     } catch (e) {
       console.error('Failed to save draft to localStorage', e);
     }
@@ -221,8 +321,11 @@ class MockBloodRequestRepository implements BloodRequestRepository {
   async getDraft(): Promise<Partial<CreateBloodRequestInput> | null> {
     await this.delay(50);
     try {
-      const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : null;
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : null;
+      }
+      return null;
     } catch (e) {
       console.error('Failed to retrieve draft from localStorage', e);
       return null;
@@ -231,7 +334,9 @@ class MockBloodRequestRepository implements BloodRequestRepository {
 
   async clearDraft(): Promise<void> {
     try {
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
     } catch (e) {
       console.error('Failed to clear draft from localStorage', e);
     }

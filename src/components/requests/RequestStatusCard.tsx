@@ -57,7 +57,7 @@ export const RequestStatusCard: React.FC<RequestStatusCardProps> = ({
   const getStatusExplanation = () => {
     switch (request.status) {
       case 'draft':
-        return 'This draft has been stored locally. Complete the clinical requirements whenever you are ready to submit to the RaktSetu network.';
+        return 'This draft has been stored locally. Complete the clinical requirements whenever you are ready to submit to the SevaSetu network.';
       case 'pending_approval':
         return `Your request for ${request.quantityLitres.toFixed(1)} L of ${request.bloodGroup} has been logged and is awaiting internal verification before querying connected blood banks.`;
       case 'approved':

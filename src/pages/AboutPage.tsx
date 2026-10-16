@@ -15,7 +15,7 @@ export const AboutPage: React.FC = () => {
           Technology that connects what already exists.
         </h1>
         <p className="text-base sm:text-lg text-[#64748B] max-w-2xl mx-auto leading-relaxed text-balance">
-          RaktSetu was conceived as a silent, intelligent digital spine for the healthcare sector—coordinating life-saving blood logistics before critical deficits emerge.
+          SevaSetu was conceived as a silent, intelligent digital spine for the healthcare sector—coordinating life-saving blood logistics before critical deficits emerge.
         </p>
       </div>
 
@@ -50,10 +50,10 @@ export const AboutPage: React.FC = () => {
             </h2>
           </div>
           <p className="text-base text-[#0F172A] font-medium mb-3 leading-relaxed">
-            RaktSetu combines inventory monitoring, prediction and intelligent matching.
+            SevaSetu combines inventory monitoring, prediction and intelligent matching.
           </p>
           <p className="text-sm text-[#64748B] leading-relaxed">
-            We don’t ask blood banks to change their clinical storage practices. Instead, RaktSetu creates a lightweight digital layer over their current management systems. Machine learning models continuously ingest surgical schedules, historical emergency patterns, and shelf-life timelines to recommend proactive transfers with zero bureaucratic friction.
+            We don’t ask blood banks to change their clinical storage practices. Instead, SevaSetu creates a lightweight digital layer over their current management systems. Machine learning models continuously ingest surgical schedules, historical emergency patterns, and shelf-life timelines to recommend proactive transfers with zero bureaucratic friction.
           </p>
         </div>
 

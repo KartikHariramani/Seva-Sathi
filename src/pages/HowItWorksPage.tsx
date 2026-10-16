@@ -57,7 +57,7 @@ export const HowItWorksPage: React.FC = () => {
       title: 'Stockout Detection & Early Warning',
       tagline: 'Automated deficit threshold notifications',
       description:
-        'When an organization’s projected consumption surpasses safe reserve velocity, RaktSetu raises a predictive stockout alert. Medical directors receive automated risk warnings with hours of lead time.',
+        'When an organization’s projected consumption surpasses safe reserve velocity, SevaSetu raises a predictive stockout alert. Medical directors receive automated risk warnings with hours of lead time.',
       technicalDetails: [
         'Configurable critical reserve thresholds (e.g. < 4 hours of O-)',
         'Deficit velocity scoring to eliminate false alarm fatigue',
@@ -70,7 +70,7 @@ export const HowItWorksPage: React.FC = () => {
       title: 'Intelligent Multi-Factor Matching',
       tagline: 'Algorithmic optimization across the entire network',
       description:
-        'RaktSetu evaluates all connected blood repositories simultaneously to locate optimal supply. The heuristic balancing engine accounts for ABO/Rh-D compatibility, physical distance, traffic conditions, and imminent expiration.',
+        'SevaSetu evaluates all connected blood repositories simultaneously to locate optimal supply. The heuristic balancing engine accounts for ABO/Rh-D compatibility, physical distance, traffic conditions, and imminent expiration.',
       technicalDetails: [
         'Universal compatibility matrix (O- universal red cells, AB universal plasma)',
         'Expiry-first sorting (units expiring within 48h prioritized to prevent waste)',
@@ -140,7 +140,7 @@ export const HowItWorksPage: React.FC = () => {
           SYSTEM ARCHITECTURE
         </span>
         <h1 className="font-poppins font-bold text-4xl sm:text-5xl text-[#0F172A] tracking-tight leading-[1.1] mb-6">
-          How RaktSetu Solves The Blood Distribution Problem
+          How SevaSetu Solves The Blood Distribution Problem
         </h1>
         <p className="text-base sm:text-lg text-[#64748B] leading-relaxed text-balance">
           An eight-stage closed-loop architecture designed to replace disconnected phone calls and fragmented spreadsheets with automated, predictive intelligence.
@@ -193,7 +193,7 @@ export const HowItWorksPage: React.FC = () => {
                   Apex Trauma Center: O- reserve drops to 2 units
                 </h4>
                 <p className="text-sm text-[#64748B] leading-relaxed">
-                  A high-velocity intake of trauma patients decreases the safe buffer below the 4-hour critical mark. RaktSetu detects the anomaly at 11:02 AM without manual nurse intervention.
+                  A high-velocity intake of trauma patients decreases the safe buffer below the 4-hour critical mark. SevaSetu detects the anomaly at 11:02 AM without manual nurse intervention.
                 </p>
               </div>
             )}
@@ -203,7 +203,7 @@ export const HowItWorksPage: React.FC = () => {
                   Phase 2 // Multi-Factor Match
                 </span>
                 <h4 className="font-poppins font-semibold text-xl text-[#0F172A]">
-                  RaktSetu matches 4 units at Red Cross Regional (6.2 km)
+                  SevaSetu matches 4 units at Red Cross Regional (6.2 km)
                 </h4>
                 <p className="text-sm text-[#64748B] leading-relaxed">
                   The algorithm identifies 4 units expiring in 48 hours at Red Cross Regional Center. Allocating these units prevents upcoming spoilage while replenishing the emergency room.
@@ -324,7 +324,7 @@ export const HowItWorksPage: React.FC = () => {
           Ready to coordinate your blood inventory?
         </h3>
         <p className="text-sm sm:text-base text-[#64748B] mb-8 max-w-xl mx-auto leading-relaxed">
-          Connect your organization to the RaktSetu predictive network and eliminate stockout risks before they impact patient care.
+          Connect your organization to the SevaSetu predictive network and eliminate stockout risks before they impact patient care.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link to="/register">

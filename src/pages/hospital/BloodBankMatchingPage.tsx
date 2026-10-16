@@ -6,6 +6,8 @@ import { bloodBankService } from '../../services/bloodBankService';
 import { reservationService } from '../../services/reservationService';
 import { useHospitalInventory } from '../../context/HospitalInventoryContext';
 import { useAppStore } from '../../store/appStore';
+import { localEventBus } from '../../sync/localEventBus';
+import { syncEngine } from '../../sync/broadcastSync';
 import type { BloodRequest } from '../../types/bloodRequest';
 import type { MatchingResult, BloodBankMatch } from '../../types/matching';
 import type { BloodReservation } from '../../types/reservation';
@@ -67,6 +69,26 @@ export const BloodBankMatchingPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+
+    const unsub1 = localEventBus.on('INVENTORY_UPDATED', () => loadData());
+    const unsub2 = localEventBus.on('REQUEST_UPDATED', () => loadData());
+    const unsub3 = localEventBus.on('RESERVATION_CREATED', () => loadData());
+    const unsub4 = syncEngine.subscribe((msg) => {
+      if (
+        msg.type === 'INVENTORY_UPDATED' ||
+        msg.type === 'REQUEST_UPDATED' ||
+        msg.type === 'RESERVATION_CREATED'
+      ) {
+        loadData();
+      }
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+    };
   }, [loadData]);
 
   // Step 20: Atomic Blood Reservation Action

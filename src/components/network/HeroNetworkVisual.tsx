@@ -14,7 +14,7 @@ export const HeroNetworkVisual: React.FC = () => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]" />
           </span>
-          <span className="font-semibold text-[#0F172A]">RAKTSETU-CORE // TELEMETRY FEED</span>
+          <span className="font-semibold text-[#0F172A]">SEVASETU-CORE // TELEMETRY FEED</span>
         </div>
         <div className="flex items-center gap-4 text-[11px]">
           <span>STATUS: <span className="text-emerald-600 font-medium">SYNCHRONIZED</span></span>
@@ -118,7 +118,7 @@ export const HeroNetworkVisual: React.FC = () => {
             </div>
           </div>
 
-          {/* Column 2: Central RaktSetu Core */}
+          {/* Column 2: Central SevaSetu Core */}
           <div className="flex flex-col items-center justify-center my-2 md:my-0">
             <div className="relative p-5 rounded-2xl bg-[#0F172A] text-white border border-slate-700/80 shadow-premium w-full max-w-xs text-center">
               <div className="w-10 h-10 rounded-full bg-[#C1272D]/20 text-[#C1272D] flex items-center justify-center mx-auto mb-3">
@@ -129,7 +129,7 @@ export const HeroNetworkVisual: React.FC = () => {
                 INTELLIGENT HUB
               </span>
               <h3 className="font-poppins font-semibold text-base text-white mb-1">
-                RaktSetu Engine
+                SevaSetu Engine
               </h3>
               <p className="text-xs text-slate-300 leading-snug mb-3">
                 Predictive allocation &amp; dispatch routing
@@ -202,7 +202,7 @@ export const HeroNetworkVisual: React.FC = () => {
         <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400">
           <span>HOSPITALS</span>
           <ArrowRight className="w-3 h-3 text-slate-300" />
-          <span>RAKTSETU</span>
+          <span>SEVASETU</span>
           <ArrowRight className="w-3 h-3 text-slate-300" />
           <span>BLOOD BANKS</span>
         </div>

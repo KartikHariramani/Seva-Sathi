@@ -159,7 +159,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let roleLabel = 'Hospital';
       if (actualRole === 'blood_bank') roleLabel = 'Blood Bank';
       else if (actualRole === 'admin') roleLabel = 'Admin';
-      else if (actualRole === 'hospital_staff') roleLabel = 'Hospital Staff';
+      else if (actualRole === 'ngo') roleLabel = 'NSS Organization';
+      else if (actualRole === 'donor') roleLabel = 'Donor';
 
       throw new Error(
         `This account is registered as a ${roleLabel} account. Please use the ${roleLabel} login option.`
@@ -203,6 +204,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (role === 'admin') demoKey = 'ADMIN';
     else if (role === 'blood_bank') demoKey = 'BLOOD_BANK';
     else if (role === 'hospital_staff') demoKey = 'HOSPITAL_STAFF';
+    else if (role === 'ngo') demoKey = 'NGO';
+    else if (role === 'donor') demoKey = 'DONOR';
 
     const identity = DEMO_IDENTITIES[demoKey];
     return login(identity.email, identity.password, role);

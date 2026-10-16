@@ -6,7 +6,9 @@ import type {
 } from '../types/nearExpiry';
 import { calculateHaversineDistance } from '../lib/supabase';
 import { localEventBus } from '../sync/localEventBus';
+import { syncEngine } from '../sync/broadcastSync';
 import type { Organization } from '../types/organization';
+import { telegramService } from './telegramService';
 
 // In-memory persistent seeded near-expiry alerts with dynamic timestamps
 const DEFAULT_ALERTS: NearExpiryAlert[] = [
@@ -77,9 +79,23 @@ const DEFAULT_ALERTS: NearExpiryAlert[] = [
 
 class NearExpiryService {
   private alerts: NearExpiryAlert[] = [];
+  private sentTelegramHistory: Map<string, { timestamp: number; hoursRemaining: number }> = new Map();
 
   constructor() {
     this.loadAlerts();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'sevasathi_near_expiry_alerts') {
+          this.loadAlerts();
+        }
+      });
+      syncEngine.subscribe((msg) => {
+        if (msg.type === 'ALERT_UPDATED') {
+          this.loadAlerts();
+        }
+      });
+    }
   }
 
   private loadAlerts() {
@@ -154,6 +170,10 @@ class NearExpiryService {
     }).sort((a, b) => a.hoursRemaining - b.hoursRemaining);
   }
 
+  public getAlertById(id: string): NearExpiryAlert | undefined {
+    return this.alerts.find((a) => a.id === id);
+  }
+
   /**
    * Create a Near-Expiry Rescue Alert
    */
@@ -197,6 +217,7 @@ class NearExpiryService {
     this.saveAlerts();
 
     localEventBus.emit('near_expiry.created', newAlert);
+    syncEngine.broadcast('ALERT_UPDATED', Date.now(), { alert: newAlert });
     return newAlert;
   }
 
@@ -244,6 +265,7 @@ class NearExpiryService {
       hospitalId: input.hospitalId,
       hospitalName: input.hospitalName,
     });
+    syncEngine.broadcast('ALERT_UPDATED', Date.now(), { alert: updatedAlert });
 
     return { success: true, reservationId };
   }
@@ -291,6 +313,182 @@ class NearExpiryService {
       };
     }).sort((a, b) => a.distanceKm - b.distanceKm);
   }
+
+  /**
+   * Idempotent 18-Hour Expiry Alert Engine & Scheduled Scanner
+   * Can be executed by background jobs or API endpoints without creating duplicate alerts.
+   */
+  public runScheduledExpiryScan(options?: {
+    thresholdHours?: number;
+    inventoryItems?: Array<{
+      unitId: string;
+      bloodGroup: BloodGroup;
+      component: any;
+      expiryTimestamp: string;
+      quantityUnits: number;
+      bloodBankId: string;
+      bloodBankName: string;
+      city: string;
+      contact: string;
+      lat: number;
+      lng: number;
+    }>;
+    hospitals?: Organization[];
+  }): {
+    jobId: string;
+    timestamp: string;
+    itemsEvaluated: number;
+    newAlertsCreated: number;
+    existingAlertsActive: number;
+    idempotentDuplicatesSuppressed: number;
+    eligibleRecommendationsCount: number;
+    telegramDispatchedCount: number;
+  } {
+    const threshold = options?.thresholdHours ?? 18.0;
+    const now = Date.now();
+    const jobId = `JOB-EXP-${new Date().toISOString().replace(/\D/g, '').substring(0, 14)}`;
+    this.refreshRemainingHours();
+
+    let newAlertsCreated = 0;
+    let duplicatesSuppressed = 0;
+    let recommendationsCount = 0;
+    let telegramDispatchedCount = 0;
+
+    // Check existing alerts to avoid recreating for same batch
+    const activeUnitIds = new Set(this.alerts.map((a) => a.batchOrUnitId));
+
+    if (options?.inventoryItems) {
+      for (const item of options.inventoryItems) {
+        const expTime = new Date(item.expiryTimestamp).getTime();
+        const diffHours = (expTime - now) / (1000 * 3600);
+
+        // Within 18 hours and not yet expired
+        if (diffHours > 0 && diffHours <= threshold) {
+          if (activeUnitIds.has(item.unitId)) {
+            duplicatesSuppressed++;
+            continue;
+          }
+
+          const created = this.createAlert({
+            bloodBankId: item.bloodBankId,
+            bloodBankName: item.bloodBankName,
+            bloodBankCity: item.city,
+            bloodBankContact: item.contact,
+            coordinates: { lat: item.lat, lng: item.lng },
+            bloodGroup: item.bloodGroup,
+            component: item.component,
+            quantityUnits: item.quantityUnits,
+            batchOrUnitId: item.unitId,
+            collectionDate: new Date(now - 25 * 86400 * 1000).toISOString().split('T')[0],
+            expiryTimestamp: item.expiryTimestamp,
+            storageCondition: 'Cold Vault 2°C - 6°C',
+            handlingConstraints: 'Strict cold-chain transit required',
+            responseDeadlineHours: Math.max(2, Math.round(diffHours * 0.7)),
+          });
+
+          activeUnitIds.add(item.unitId);
+          newAlertsCreated++;
+
+          // Automatically dispatch Telegram alert if within threshold
+          this.dispatchExpiryTelegramAlert(created).then((dispatched) => {
+            if (dispatched) telegramDispatchedCount++;
+          });
+
+          if (options.hospitals) {
+            const feasible = this.rankReceivingHospitals(created, options.hospitals).filter((h) => h.isFeasible);
+            recommendationsCount += feasible.length;
+          }
+        }
+      }
+    }
+
+    // Also evaluate any pre-existing active alerts that haven't had a Telegram alert dispatched recently
+    for (const existingAlert of this.alerts) {
+      if (existingAlert.status === 'ACTIVE' && existingAlert.hoursRemaining > 0 && existingAlert.hoursRemaining <= threshold) {
+        this.dispatchExpiryTelegramAlert(existingAlert).then((dispatched) => {
+          if (dispatched) telegramDispatchedCount++;
+        });
+      }
+    }
+
+    const activeCount = this.alerts.filter((a) => a.status === 'ACTIVE' && a.hoursRemaining <= threshold).length;
+
+    return {
+      jobId,
+      timestamp: new Date().toISOString(),
+      itemsEvaluated: options?.inventoryItems ? options.inventoryItems.length : this.alerts.length,
+      newAlertsCreated,
+      existingAlertsActive: activeCount,
+      idempotentDuplicatesSuppressed: duplicatesSuppressed,
+      eligibleRecommendationsCount: recommendationsCount,
+      telegramDispatchedCount,
+    };
+  }
+
+  /**
+   * Dispatches a formatted Near-Expiry Telegram alert to blood bank / hospital staff
+   * Includes idempotency deduplication to prevent duplicate alerts within the same window.
+   */
+  public async dispatchExpiryTelegramAlert(
+    alert: NearExpiryAlert,
+    recipientChatId?: string
+  ): Promise<boolean> {
+    const targetChat = recipientChatId || '100001'; // Default staff / demo recipient
+    const nowMs = Date.now();
+    const bucket = Math.floor(nowMs / (1000 * 3600 * 4)); // 4-hour cooldown bucket
+    const key = `EXP_TG_${alert.batchOrUnitId}_${bucket}`;
+
+    if (this.sentTelegramHistory.has(key)) {
+      return false; // Deduplicated
+    }
+
+    const messageText = `🚨 <b>SEVASETU — BLOOD UNIT EXPIRY ALERT</b>\n\n• <b>Facility:</b> ${alert.bloodBankName}\n• <b>Blood Group:</b> ${alert.bloodGroup}\n• <b>Component:</b> ${alert.component}\n• <b>Eligible Units or Batch Quantity:</b> ${alert.quantityUnits} Units (Batch: ${alert.batchOrUnitId})\n• <b>Expiry Time:</b> ${alert.expiryTimestamp}\n• <b>Time Remaining:</b> ${alert.hoursRemaining} hours\n• <b>Recommended Action:</b> Review the unit and follow the authorized blood-bank handling and transfer procedures.\n\n🔗 <a href="http://localhost:5174/blood-bank/near-expiry">Open SevaSetu Expiry Rescue Portal</a>`;
+
+    try {
+      const res = await telegramService.sendNotification({
+        chatId: targetChat,
+        text: messageText,
+        messageType: 'TRANSACTIONAL',
+        idempotencyKey: key,
+      });
+
+      if (res.success) {
+        this.sentTelegramHistory.set(key, {
+          timestamp: nowMs,
+          hoursRemaining: alert.hoursRemaining,
+        });
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('[NearExpiryService] Failed to dispatch Telegram alert:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Clear sent alert history (for test isolation)
+   */
+  public clearTelegramHistory(): void {
+    this.sentTelegramHistory.clear();
+  }
+
+  /**
+   * Closes or invalidates an alert when unit is consumed or transferred
+   */
+  public invalidateAlert(alertId: string, reason: 'CONSUMED' | 'TRANSFERRED' | 'CANCELLED'): boolean {
+    const idx = this.alerts.findIndex((a) => a.id === alertId);
+    if (idx === -1) return false;
+
+    this.alerts[idx] = {
+      ...this.alerts[idx],
+      status: reason === 'TRANSFERRED' ? 'TRANSFERRED' : 'CANCELLED',
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveAlerts();
+    return true;
+  }
 }
 
 export const nearExpiryService = new NearExpiryService();
+

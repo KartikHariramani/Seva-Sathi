@@ -1,5 +1,12 @@
 import type { BloodGroup } from '../types';
 import type { CreateBloodRequestInput, RequestValidationResult } from '../types/bloodRequest';
+import {
+  validateUrgencyDeadline,
+  calculateUrgencyDeadline,
+  getDefaultClinicalReason,
+} from './urgencyPolicy';
+
+export * from './urgencyPolicy';
 
 const VALID_BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -36,26 +43,22 @@ export function validateBloodRequest(
     errors.priority = 'Invalid priority selection.';
   }
 
-  // 4. Required by validation
-  if (!data.requiredBy || !data.requiredBy.trim()) {
-    errors.requiredBy = 'Please specify when this blood is required by.';
-  } else {
-    const parsedDate = new Date(data.requiredBy);
-    if (isNaN(parsedDate.getTime())) {
-      errors.requiredBy = 'Please enter a valid date and time.';
-    } else {
-      // Must not be in the past (allow a 2-minute buffer for form fill)
-      const nowBuffer = Date.now() - 2 * 60 * 1000;
-      if (parsedDate.getTime() < nowBuffer) {
-        errors.requiredBy = 'Required time cannot be in the past.';
-      }
-    }
+  // 4. Required by validation (with urgency deadline policy checking)
+  const effectiveDeadline = data.requiredBy && data.requiredBy.trim()
+    ? data.requiredBy
+    : calculateUrgencyDeadline(data.priority || 'emergency');
+
+  const urgencyValidation = validateUrgencyDeadline(data.priority || 'emergency', effectiveDeadline);
+  if (!urgencyValidation.isValid) {
+    errors.requiredBy = urgencyValidation.error || 'Invalid requirement deadline.';
   }
 
   // 5. Reason validation (Conditional)
-  // Section 16 & 35: Optional for routine, required for urgent/emergency
+  // When Section 03 is omitted from UI, apply standard protocol reason for the urgency tier
   const isUrgentOrEmergency = data.priority === 'urgent' || data.priority === 'emergency';
-  const reasonText = data.reason?.trim() || '';
+  const reasonText = (data.reason !== undefined && data.reason !== null && data.reason.trim())
+    ? data.reason.trim()
+    : getDefaultClinicalReason(data.priority || 'emergency');
 
   if (isUrgentOrEmergency && !reasonText) {
     errors.reason = 'Clinical reason is required for urgent and emergency requests.';

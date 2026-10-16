@@ -27,13 +27,80 @@ export const Navbar: React.FC = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  const navLinks = [
-    { label: 'How It Works', path: '/how-it-works' },
-    { label: 'Live Network', path: '/network' },
-    { label: 'Near-Expiry Rescue', path: '/near-expiry' },
-    { label: 'Donor Hub', path: '/donor/portal' },
-    { label: 'About', path: '/about' },
-  ];
+  const getRoleDashboardRoute = (role?: string) => {
+    switch (role) {
+      case 'donor':
+        return '/donor/portal';
+      case 'hospital':
+        return '/hospital/dashboard';
+      case 'hospital_staff':
+        return '/hospital/staff/dashboard';
+      case 'blood_bank':
+        return '/blood-bank/dashboard';
+      case 'ngo':
+        return '/ngo/campaigns';
+      case 'admin':
+        return '/admin/command-center';
+      default:
+        return '/';
+    }
+  };
+
+  const getNavLinks = () => {
+    if (!isAuthenticated || !user) {
+      return [
+        { label: 'How It Works', path: '/how-it-works' },
+        { label: 'Live Network', path: '/network' },
+        { label: 'Blood Drives', path: '/campaigns' },
+        { label: 'About', path: '/about' },
+      ];
+    }
+
+    switch (user.role) {
+      case 'donor':
+        return [
+          { label: 'Browse Drives', path: '/donor/portal' },
+          { label: 'My Registrations', path: '/donor/registrations' },
+          { label: 'Telegram & Alerts', path: '/donor/notifications' },
+          { label: 'Live Network', path: '/network' },
+        ];
+      case 'hospital':
+      case 'hospital_staff':
+        return [
+          { label: 'Hospital Overview', path: '/hospital/dashboard' },
+          { label: 'Blood Requisitions', path: '/hospital/requests' },
+          { label: '+ New Request', path: '/hospital/requests/new' },
+          { label: 'Live Network', path: '/hospital/network' },
+        ];
+      case 'blood_bank':
+        return [
+          { label: 'Blood Bank Portal', path: '/blood-bank/dashboard' },
+          { label: 'Near-Expiry Rescue', path: '/blood-bank/near-expiry' },
+          { label: 'Inventory', path: '/blood-bank/inventory' },
+        ];
+      case 'ngo':
+        return [
+          { label: 'Campaign Management', path: '/ngo/campaigns' },
+          { label: 'Turnout Telemetry', path: '/organizer/telemetry' },
+        ];
+      case 'admin':
+        return [
+          { label: 'Command Center', path: '/admin/command-center' },
+          { label: 'Organizations', path: '/admin/organizations' },
+          { label: 'Audit Logs', path: '/admin/audit-logs' },
+          { label: 'Governance & Diagnostics', path: '/admin/settings' },
+        ];
+      default:
+        return [
+          { label: 'How It Works', path: '/how-it-works' },
+          { label: 'Live Network', path: '/network' },
+          { label: 'Blood Drives', path: '/campaigns' },
+          { label: 'About', path: '/about' },
+        ];
+    }
+  };
+
+  const navLinks = getNavLinks();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -73,7 +140,7 @@ export const Navbar: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-poppins font-bold text-lg tracking-tight text-[#0F172A] leading-tight flex items-center gap-1.5">
-                Seva Sathi
+                SevaSetu
                 <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 text-[#1E4C8A] bg-blue-50 border border-blue-200/60 rounded">
                   Healthcare
                 </span>
@@ -106,11 +173,11 @@ export const Navbar: React.FC = () => {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <Link
-                  to="/dashboard-preview"
+                  to={getRoleDashboardRoute(user?.role)}
                   className="flex items-center gap-2 text-xs font-mono font-medium bg-slate-100 hover:bg-slate-200/80 text-slate-800 px-3 py-1.5 rounded border border-slate-200 transition-colors"
                 >
                   <Activity className="w-3.5 h-3.5 text-[#10B981]" />
-                  <span>{user?.orgName || 'Workspace'}</span>
+                  <span>{user?.orgName || user?.email || 'Authorized Portal'}</span>
                 </Link>
                 <button
                   onClick={logout}

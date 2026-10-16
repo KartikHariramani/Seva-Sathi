@@ -25,7 +25,7 @@ export const SetupCompletePage: React.FC = () => {
 
         {/* Small Text */}
         <p className="text-base text-[#64748B] mb-8 font-normal">
-          Your RaktSetu workspace has been created.
+          Your SevaSetu workspace has been created.
         </p>
 
         {/* Summary Card */}

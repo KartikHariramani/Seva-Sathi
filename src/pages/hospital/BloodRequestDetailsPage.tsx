@@ -270,13 +270,13 @@ export const BloodRequestDetailsPage: React.FC = () => {
               </div>
 
               <p className="text-xs text-[#64748B] leading-relaxed">
-                Need to escalate this requisition or alter medical parameters? Contact the regional RaktSetu command dispatch desk directly.
+                Need to escalate this requisition or alter medical parameters? Contact the regional SevaSetu command dispatch desk directly.
               </p>
 
               <div className="pt-2 text-xs font-mono space-y-1.5">
                 <div className="flex items-center gap-2 text-slate-700">
                   <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Helpline: 1800-RAKT-SETU</span>
+                  <span>Helpline: 1800-SEVA-SETU</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -289,7 +289,7 @@ export const BloodRequestDetailsPage: React.FC = () => {
             <div className="rounded-xl border border-dashed border-slate-300 p-4 text-xs font-mono text-slate-500 bg-white">
               <div className="flex items-center gap-1.5 text-[#1E4C8A] font-semibold mb-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>RaktSetu Architecture Note</span>
+                <span>SevaSetu Architecture Note</span>
               </div>
               <p className="text-[11px] text-slate-500 leading-normal">
                 This request record is ready for Phase 3 predictive load balancing. Connected blood banks will receive real-time dispatch alerts upon approval.

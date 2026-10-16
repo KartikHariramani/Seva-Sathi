@@ -7,6 +7,7 @@ import type {
 } from '../types/donor';
 import { calculateHaversineDistance } from '../lib/supabase';
 import { localEventBus } from '../sync/localEventBus';
+import { telegramService } from './telegramService';
 
 const DEFAULT_DONORS: DonorProfile[] = [
   {
@@ -216,6 +217,18 @@ class DonorService {
 
         newNotifications.push(notif);
         this.notifications.unshift(notif);
+
+        // Dispatch outbound alert to Telegram if donor preferred channel is TELEGRAM
+        if (donor.preferredChannel === 'TELEGRAM' && donor.telegramChatId) {
+          telegramService
+            .sendNotification({
+              chatId: donor.telegramChatId,
+              text: `🚨 <b>Emergency Blood Shortage Alert</b>\n\n${notif.messageText}\n\n<i>Type /status in Telegram to view options or respond.</i>`,
+              messageType: 'TRANSACTIONAL',
+              idempotencyKey: `ALERT_${notif.id}`,
+            })
+            .catch(() => {});
+        }
       }
     }
 

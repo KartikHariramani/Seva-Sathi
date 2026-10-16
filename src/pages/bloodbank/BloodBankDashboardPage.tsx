@@ -16,6 +16,10 @@ import {
 import { ALL_BLOOD_GROUPS } from '../../store/selectors';
 import { SmartInventoryImportPage } from '../inventory/SmartInventoryImportPage';
 import { NearExpiryRescuePage } from '../nearexpiry/NearExpiryRescuePage';
+import { ShortageBuzzerBanner } from '../../components/alerts/ShortageBuzzerBanner';
+import { bloodRequestRepository } from '../../services/bloodRequestRepository';
+import { bloodBankService } from '../../services/bloodBankService';
+import { syncEngine } from '../../sync/broadcastSync';
 
 export const BloodBankDashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -114,6 +118,19 @@ export const BloodBankDashboardPage: React.FC = () => {
       });
     }, 'RESERVATION_CREATED');
 
+    // Authoritatively synchronize bloodRequestRepository & bloodBankService across dashboards
+    bloodRequestRepository.updateRequest(reqId, {
+      status: 'reserved',
+      matchedBloodBankId: bankId,
+      matchedBloodBankName: bankName,
+    }).catch((err) => console.warn('Sync to request repo failed:', err));
+
+    bloodBankService.reserveStockAtBank(bankId, bloodGroup as BloodGroup, quantity)
+      .catch((err) => console.warn('Sync to blood bank service failed:', err));
+
+    syncEngine.broadcast('REQUEST_UPDATED', Date.now(), { reqId, status: 'reserved' });
+    syncEngine.broadcast('INVENTORY_UPDATED', Date.now(), { bankId, bloodGroup });
+
     setActionSuccessMsg(`Reserved ${quantity} L of ${bloodGroup} successfully. Ready for cold-chain dispatch.`);
     setTimeout(() => setActionSuccessMsg(''), 4000);
   };
@@ -174,6 +191,17 @@ export const BloodBankDashboardPage: React.FC = () => {
       });
     }, 'TRANSFER_UPDATED');
 
+    // Authoritatively synchronize bloodRequestRepository & bloodBankService
+    bloodRequestRepository.updateRequest(reqId, {
+      status: 'in_transit',
+    }).catch((err) => console.warn('Sync to request repo failed:', err));
+
+    bloodBankService.fulfillOrReleaseBankStock(bankId, bloodGroup as BloodGroup, quantity, 'fulfill')
+      .catch((err) => console.warn('Sync to blood bank stock failed:', err));
+
+    syncEngine.broadcast('REQUEST_UPDATED', Date.now(), { reqId, status: 'in_transit' });
+    syncEngine.broadcast('INVENTORY_UPDATED', Date.now(), { bankId, bloodGroup });
+
     setActionSuccessMsg(`Transfer dispatched to ${hospName}. Cold-chain courier in transit.`);
     setTimeout(() => setActionSuccessMsg(''), 4000);
   };
@@ -221,6 +249,11 @@ export const BloodBankDashboardPage: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Realtime Shortage Buzzer & Alert Banner */}
+        <ShortageBuzzerBanner
+          onNavigateToReplenish={() => setActiveTab('INVENTORY')}
+        />
+
         {actionSuccessMsg && (
           <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5 animate-in fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />

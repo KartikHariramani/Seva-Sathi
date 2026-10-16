@@ -7,6 +7,7 @@ import type {
 } from '../data/hospitalInventory';
 import { inventoryService } from '../services/inventoryService';
 import { localEventBus } from '../sync/localEventBus';
+import { shortageDetectionService } from '../services/shortageDetectionService';
 
 interface ToastNotification {
   id: string;
@@ -54,12 +55,22 @@ export const HospitalInventoryProvider: React.FC<{ children: React.ReactNode }> 
   const summary = inventoryService.calculateSummary(inventory);
 
   useEffect(() => {
+    // Initial evaluation of baseline inventory state (no audible buzz on initial page load)
+    shortageDetectionService.evaluateBatch(
+      inventory.map((i) => ({ bloodGroup: i.bloodGroup, availableQuantity: i.availableQuantity })),
+      { facilityId: 'HOSP-001', facilityName: 'City General Care Hospital', triggerBuzzer: false }
+    );
+
     const unsub = localEventBus.on('INVENTORY_UPDATED', () => {
       const fresh = inventoryService.getInventory();
       const freshAct = inventoryService.getActivity();
       setInventory(fresh);
       setActivity(freshAct);
       setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      shortageDetectionService.evaluateBatch(
+        fresh.map((i) => ({ bloodGroup: i.bloodGroup, availableQuantity: i.availableQuantity })),
+        { facilityId: 'HOSP-001', facilityName: 'City General Care Hospital', triggerBuzzer: true }
+      );
     });
     return unsub;
   }, []);
@@ -101,6 +112,11 @@ export const HospitalInventoryProvider: React.FC<{ children: React.ReactNode }> 
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setLastUpdatedTime(timeStr);
+
+      shortageDetectionService.evaluateBatch(
+        fresh.map((i) => ({ bloodGroup: i.bloodGroup, availableQuantity: i.availableQuantity })),
+        { facilityId: 'HOSP-001', facilityName: 'City General Care Hospital', triggerBuzzer: false }
+      );
     } catch {
       setError("Inventory couldn't be loaded");
     } finally {
@@ -163,6 +179,12 @@ export const HospitalInventoryProvider: React.FC<{ children: React.ReactNode }> 
         inventoryService.saveInventory(updatedList);
         inventoryService.saveActivity(updatedActivity);
         setLastUpdatedTime(timeStr);
+
+        // Evaluate shortage transitions & trigger buzzer / Telegram notification if critical
+        shortageDetectionService.evaluateBatch(
+          updatedList.map((i) => ({ bloodGroup: i.bloodGroup, availableQuantity: i.availableQuantity })),
+          { facilityId: 'HOSP-001', facilityName: 'City General Care Hospital', triggerBuzzer: true }
+        );
 
         // Show toast
         setToast({

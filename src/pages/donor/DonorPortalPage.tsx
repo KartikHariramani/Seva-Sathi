@@ -1,420 +1,365 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Heart,
-  Bell,
-  ShieldCheck,
-  CheckCircle2,
-  XCircle,
+  Calendar,
   MapPin,
-  Sparkles,
-  ToggleLeft,
-  ToggleRight,
-  Radio,
   Clock,
-  Award,
+  Search,
+  Filter,
+  CheckCircle2,
+  Users,
+  ArrowRight,
+  QrCode,
+  Radio,
 } from 'lucide-react';
-import type { CommunicationChannel, DonorNotificationStatus, DonorProfile, EmergencyDonorNotification } from '../../types/donor';
+import { Link } from 'react-router-dom';
+import { DonorLayout } from '../../components/donor/DonorLayout';
+import { campaignService } from '../../services/campaignService';
 import { donorService } from '../../services/donorService';
+import { useAuth } from '../../context/AuthContext';
+import type { BloodCampaign, CampaignRegistration } from '../../types/campaign';
+import type { DonorProfile } from '../../types/donor';
 import { localEventBus } from '../../sync/localEventBus';
 
 export const DonorPortalPage: React.FC = () => {
-  // Use first default donor as active session
-  const [donor, setDonor] = useState<DonorProfile>(() => donorService.getDonors()[0]);
-  const [notifications, setNotifications] = useState<EmergencyDonorNotification[]>([]);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  const getActiveDonor = (): DonorProfile => {
+    const all = donorService.getDonors();
+    if (user?.orgId) {
+      const match = all.find((d) => d.id === user.orgId);
+      if (match) return match;
+    }
+    if (user?.email) {
+      const match = all.find((d) => d.email.toLowerCase() === user.email.toLowerCase());
+      if (match) return match;
+    }
+    return all[0];
+  };
+
+  const donor = getActiveDonor();
+  const [campaigns, setCampaigns] = useState<BloodCampaign[]>([]);
+  const [myRegistrations, setMyRegistrations] = useState<CampaignRegistration[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [cityFilter, setCityFilter] = useState('ALL');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'ALL' | 'OPEN_ONLY'>('ALL');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Time slot selection modal state
+  const [selectedCampaignForSlot, setSelectedCampaignForSlot] = useState<BloodCampaign | null>(null);
+  const [selectedSlotTime, setSelectedSlotTime] = useState<string>('09:30 - 10:30');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const loadData = () => {
-    const current = donorService.getDonorById(donor.id) || donor;
-    setDonor(current);
-    const notifs = donorService.getNotifications({ donorId: donor.id });
-    setNotifications(notifs);
+    const allCamps = campaignService.getCampaigns();
+    setCampaigns(allCamps);
+    const regs = campaignService.getRegistrationsByDonor(donor.id);
+    setMyRegistrations(regs);
   };
 
   useEffect(() => {
     loadData();
-    const unsubMob = localEventBus.on('donors.mobilized', loadData);
-    const unsubResp = localEventBus.on('donor.responded', loadData);
-    const unsubUpd = localEventBus.on('donor.updated', loadData);
-
+    const unsub1 = localEventBus.on('campaign.registered', loadData);
+    const unsub2 = localEventBus.on('campaign.checked_in', loadData);
+    const unsub3 = localEventBus.on('campaign.cancelled', loadData);
+    const unsub4 = localEventBus.on('campaign.created', loadData);
+    const unsub5 = localEventBus.on('campaign.updated', loadData);
     return () => {
-      unsubMob();
-      unsubResp();
-      unsubUpd();
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      unsub5();
     };
   }, [donor.id]);
 
-  const handleToggleAvailability = () => {
-    const updated = donorService.updateDonorConsent(donor.id, {
-      isAvailable: !donor.isAvailable,
-    });
-    setDonor(updated);
-    setActionMessage(
-      updated.isAvailable
-        ? 'Status updated: You are now marked Available for emergency calls.'
-        : 'Status updated: You are marked Deferred / Away. Emergency alerts are paused.'
-    );
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleToggleEmergencyConsent = () => {
-    const updated = donorService.updateDonorConsent(donor.id, {
-      consentEmergencyAlerts: !donor.consentEmergencyAlerts,
+  // Distinct cities list
+  const availableCities = useMemo(() => {
+    const set = new Set<string>();
+    campaigns.forEach((c) => {
+      if (c.city) set.add(c.city);
     });
-    setDonor(updated);
-    setActionMessage(
-      updated.consentEmergencyAlerts
-        ? 'Emergency outreach consent enabled.'
-        : 'Emergency outreach consent revoked. The system will NOT contact you during shortages.'
-    );
+    return Array.from(set);
+  }, [campaigns]);
+
+  // Filtered campaigns
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter((c) => {
+      const matchesSearch =
+        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.venueName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.organizerName.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesCity = cityFilter === 'ALL' || c.city.toLowerCase() === cityFilter.toLowerCase();
+      const matchesAvailability =
+        availabilityFilter === 'ALL' || c.registeredCount < c.capacityTarget;
+
+      return matchesSearch && matchesCity && matchesAvailability;
+    });
+  }, [campaigns, searchQuery, cityFilter, availabilityFilter]);
+
+  const handleOpenSlotModal = (camp: BloodCampaign) => {
+    setSelectedCampaignForSlot(camp);
+    setSelectedSlotTime('09:30 - 10:30');
   };
 
-  const handleToggleFutureConsent = () => {
-    const updated = donorService.updateDonorConsent(donor.id, {
-      consentFutureDrives: !donor.consentFutureDrives,
-    });
-    setDonor(updated);
-  };
+  const handleConfirmRegistration = () => {
+    if (!selectedCampaignForSlot) return;
+    setIsRegistering(true);
 
-  const handleChannelChange = (channel: CommunicationChannel) => {
-    const updated = donorService.updateDonorConsent(donor.id, {
-      preferredChannel: channel,
-    });
-    setDonor(updated);
-    setActionMessage(`Preferred delivery channel updated to ${channel}.`);
-  };
+    try {
+      const res = campaignService.registerDonor({
+        campaignId: selectedCampaignForSlot.id,
+        donorId: donor.id,
+        donorName: donor.fullName,
+        donorPhone: donor.phone,
+        donorEmail: donor.email,
+        bloodGroup: donor.bloodGroup,
+        timeSlot: selectedSlotTime,
+        priorDonationsCount: donor.totalDonations,
+        distanceKm: 4.0,
+      });
 
-  const handleRespond = (notifId: string, status: DonorNotificationStatus) => {
-    donorService.respondToNotification(notifId, status);
-    loadData();
-    if (status === 'ACCEPTED') {
-      setActionMessage(
-        'Thank you! Your response is logged. Please arrive at the hospital transfusion desk within 90 minutes.'
-      );
-    } else {
-      setActionMessage('Response recorded. Thank you for notifying the clinical team.');
+      if (res.success && res.registration) {
+        loadData();
+        setSelectedCampaignForSlot(null);
+        showToast(
+          res.isWaitlisted
+            ? 'Capacity reached: You have been placed on the priority waitlist.'
+            : `Reservation confirmed for slot ${selectedSlotTime}! Digital QR Pass issued.`
+        );
+      } else {
+        showToast(res.error || 'Failed to complete registration.');
+      }
+    } finally {
+      setIsRegistering(false);
     }
   };
 
-  // Seed sample emergency alert for demonstration if none exist
-  const handleTriggerSimulatedShortage = () => {
-    donorService.mobilizeForShortage({
-      requestId: 'REQ-EMERG-904',
-      bloodGroup: donor.bloodGroup,
-      shortageUnits: 2,
-      hospitalName: 'Metropolitan Trauma & General Hospital',
-      hospitalCity: 'Nagpur',
-      hospitalLat: 21.128,
-      hospitalLng: 79.098,
-      urgency: 'critical',
-    });
-    loadData();
-    setActionMessage('Simulated regional emergency shortage broadcast delivered to your feed!');
-  };
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold font-poppins text-slate-900 tracking-tight">
-              Donor Volunteer Hub & Emergency Feed
+    <DonorLayout pageTitle="Browse Voluntary Blood Drives">
+      <div className="space-y-6 max-w-7xl mx-auto">
+        {/* Hero Section */}
+        <div className="bg-linear-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-xl">
+            <span className="text-[10px] font-mono tracking-wider text-red-400 font-bold uppercase bg-red-950/80 px-2.5 py-1 rounded-full border border-red-800/80 inline-block">
+              VOLUNTARY BLOOD MOBILIZATION
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-bold font-poppins tracking-tight">
+              Find &amp; Join Community Blood Drives
             </h1>
-            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-              Verified Donor Network
-            </span>
-          </div>
-          <p className="text-sm text-slate-600 mt-1">
-            Manage your donation eligibility, emergency communication consent, and respond to live clinical shortages.
-          </p>
-        </div>
-
-        <button
-          onClick={handleTriggerSimulatedShortage}
-          className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm shrink-0"
-        >
-          <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
-          <span>Simulate Emergency Shortage</span>
-        </button>
-      </div>
-
-      {actionMessage && (
-        <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between text-sm text-blue-900 animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
-            <span>{actionMessage}</span>
-          </div>
-          <button
-            onClick={() => setActionMessage(null)}
-            className="text-xs font-semibold text-blue-700 hover:underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Donor Profile Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-[#C1272D] text-white flex flex-col items-center justify-center shadow-md shrink-0">
-            <span className="text-2xl font-bold font-poppins leading-none">{donor.bloodGroup}</span>
-            <span className="text-[10px] font-mono mt-0.5 opacity-90">DONOR</span>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900 font-poppins">{donor.fullName}</h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800">
-                VERIFIED
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {donor.city} • Donor ID: {donor.id} • Registered Volunteer
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Browse verified drives organized by regional NGOs, universities, and hospitals. Reserve your preferred time slot and receive your official digital pass instantly.
             </p>
+          </div>
 
-            <div className="flex items-center gap-4 mt-2 text-xs font-medium text-slate-600">
-              <span className="flex items-center gap-1">
-                <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                {donor.totalDonations} Lives Touched
-              </span>
-              <span className="flex items-center gap-1">
-                <Award className="w-3.5 h-3.5 text-amber-500" />
-                {donor.rewardPoints} Seva Points
-              </span>
-            </div>
+          <div className="flex flex-row md:flex-col gap-3 shrink-0">
+            <Link
+              to="/donor/registrations"
+              className="px-4 py-2.5 rounded-xl bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold font-poppins flex items-center justify-center gap-2 shadow-xs transition-all"
+            >
+              <QrCode className="w-4 h-4 text-red-600" />
+              <span>My Passes ({myRegistrations.length})</span>
+            </Link>
+
+            <Link
+              to="/donor/notifications"
+              className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+            >
+              <Radio className="w-3.5 h-3.5 text-sky-400" />
+              <span>Telegram Sync</span>
+            </Link>
           </div>
         </div>
 
-        {/* Realtime Availability Switch */}
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 flex items-center justify-between gap-6 shrink-0">
-          <div>
-            <div className="text-xs font-bold text-slate-900">Emergency Call Status</div>
-            <div className="text-[11px] text-slate-500">
-              {donor.isAvailable ? 'Ready for urgent calls' : 'Deferred / Traveling'}
+        {/* Toast Alert */}
+        {toastMessage && (
+          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-900 flex items-center justify-between shadow-xs animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{toastMessage}</span>
             </div>
+            <button onClick={() => setToastMessage(null)} className="text-xs font-semibold text-emerald-700 hover:underline">
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Search & Filter Toolbar */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by drive title, venue, organizer, or city..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#C1272D]/20 focus:border-[#C1272D]"
+            />
           </div>
 
-          <button
-            onClick={handleToggleAvailability}
-            className={`p-1 rounded-full transition-colors ${
-              donor.isAvailable ? 'text-emerald-600' : 'text-slate-400'
-            }`}
-          >
-            {donor.isAvailable ? (
-              <ToggleRight className="w-10 h-10" />
-            ) : (
-              <ToggleLeft className="w-10 h-10" />
-            )}
-          </button>
-        </div>
-      </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {/* City Dropdown */}
+            <select
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            >
+              <option value="ALL">All Cities</option>
+              {availableCities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left: Consent & Communication Preferences (4 Cols) */}
-        <div className="lg:col-span-4 space-y-5">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
-              <h3 className="text-sm font-bold text-slate-900">Communication & Consent Policy</h3>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              In accordance with ethical clinical guidelines, Seva Sathi strictly honors your explicit communication permissions.
-            </p>
-
-            <div className="space-y-3 pt-1">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs font-semibold text-slate-800">
-                    Emergency Shortage Alerts
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Receive urgent broadcasts when ICU/surgery blood stocks run critically low
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={donor.consentEmergencyAlerts}
-                  onChange={handleToggleEmergencyConsent}
-                  className="rounded text-[#C1272D] focus:ring-[#C1272D] mt-1"
-                />
-              </div>
-
-              <div className="flex items-start justify-between gap-3 pt-2 border-t border-slate-100">
-                <div>
-                  <div className="text-xs font-semibold text-slate-800">
-                    Future Donation Drives
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Invitations to regional community blood drives
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={donor.consentFutureDrives}
-                  onChange={handleToggleFutureConsent}
-                  className="rounded text-blue-600 focus:ring-blue-600 mt-1"
-                />
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100">
-              <label className="block text-xs font-semibold text-slate-800 mb-2">
-                Preferred Notification Channel
-              </label>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                {(['IN_APP', 'TELEGRAM', 'SMS'] as CommunicationChannel[]).map((ch) => (
-                  <button
-                    key={ch}
-                    onClick={() => handleChannelChange(ch)}
-                    className={`py-1.5 px-2 rounded-lg border font-mono text-[11px] transition-all ${
-                      donor.preferredChannel === ch
-                        ? 'border-[#C1272D] bg-red-50 text-[#C1272D] font-bold'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                    }`}
-                  >
-                    {ch}
-                  </button>
-                ))}
-              </div>
-
-              {donor.preferredChannel === 'TELEGRAM' && (
-                <div className="mt-3 p-2.5 rounded-lg bg-sky-50 border border-sky-200 text-[11px] text-sky-900 space-y-1 font-mono">
-                  <div className="font-bold">Telegram Chat Linked:</div>
-                  <div>ID: {donor.telegramChatId || 'Not connected'}</div>
-                  <div className="text-[10px] text-sky-700 font-sans">
-                    Send /start to @RaktSetuBot on Telegram to verify.
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Life Saver Badge Card */}
-          <div className="bg-linear-to-br from-[#0F172A] to-[#1E293B] text-white p-5 rounded-xl shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-semibold text-red-400">HERO BADGE</span>
-              <Sparkles className="w-4 h-4 text-amber-400" />
-            </div>
-            <h4 className="text-base font-bold font-poppins">Universal Savior Tier</h4>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Your donation history has directly contributed to emergency trauma surgeries and neonatal transfusions across Maharashtra.
-            </p>
-            <div className="pt-2 text-[11px] font-mono text-slate-400">
-              Next eligible donation: November 15, 2026
-            </div>
+            {/* Availability Toggle */}
+            <button
+              type="button"
+              onClick={() => setAvailabilityFilter(availabilityFilter === 'ALL' ? 'OPEN_ONLY' : 'ALL')}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                availabilityFilter === 'OPEN_ONLY'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>{availabilityFilter === 'OPEN_ONLY' ? 'Open Slots Only' : 'All Capacities'}</span>
+            </button>
           </div>
         </div>
 
-        {/* Right: Live Emergency Shortage Broadcasts Feed (8 Cols) */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-[#C1272D]" />
-              <h3 className="text-sm font-bold text-slate-900">
-                Live Regional Shortage Broadcasts
-              </h3>
-            </div>
-            <span className="text-xs font-mono text-slate-500">
-              {notifications.length} Broadcast{notifications.length === 1 ? '' : 's'}
-            </span>
+        {/* Drives Grid */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+            <span>Showing {filteredCampaigns.length} verified blood drives</span>
+            <span>Eligibility: {donor.bloodGroup} Voluntary Donor</span>
           </div>
 
-          {notifications.length === 0 ? (
-            <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500 space-y-2">
-              <Heart className="w-8 h-8 mx-auto text-slate-400" />
-              <p className="text-sm font-semibold text-slate-800">
-                No active emergency shortages for {donor.bloodGroup} in your area.
-              </p>
-              <p className="text-xs text-slate-400">
-                Regional blood banks currently meet demand. We will notify you instantly if an urgent requirement arises.
+          {filteredCampaigns.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
+              <Calendar className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-800">No matching drives found</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                No active donation drives match your search filters. Try clearing your search query or city selection.
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {notifications.map((notif) => {
-                const isAccepted = notif.status === 'ACCEPTED';
-                const isDeclined = notif.status === 'DECLINED';
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredCampaigns.map((camp) => {
+                const isRegistered = myRegistrations.some(
+                  (r) => r.campaignId === camp.id && r.status !== 'CANCELLED'
+                );
+                const percentFull = Math.min(100, Math.round((camp.registeredCount / camp.capacityTarget) * 100));
+                const isFull = camp.registeredCount >= camp.capacityTarget;
 
                 return (
                   <div
-                    key={notif.id}
-                    className={`bg-white rounded-xl border p-5 transition-all shadow-sm ${
-                      isAccepted
-                        ? 'border-emerald-300 bg-emerald-50/20'
-                        : isDeclined
-                          ? 'border-slate-200 opacity-60'
-                          : notif.urgency === 'critical'
-                            ? 'border-red-300 ring-1 ring-red-100'
-                            : 'border-slate-200'
+                    key={camp.id}
+                    className={`bg-white rounded-2xl border p-5 flex flex-col justify-between transition-all shadow-xs hover:shadow-md ${
+                      isRegistered ? 'border-emerald-300 bg-emerald-50/10 ring-1 ring-emerald-100' : 'border-slate-200'
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-lg font-bold font-poppins text-[#C1272D]">
-                          {notif.bloodGroup}
+                    <div className="space-y-4">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
+                          {camp.city}
                         </span>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-100 text-red-800 font-mono">
-                          {notif.requiredUnits} Units Needed
-                        </span>
-                        <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                          {notif.urgency}
-                        </span>
+
+                        {isRegistered ? (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            REGISTERED
+                          </span>
+                        ) : isFull ? (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                            WAITLIST ONLY
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                            SLOTS AVAILABLE
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{new Date(notif.sentAt).toLocaleTimeString()}</span>
+                      {/* Title & Host */}
+                      <div>
+                        <h3 className="font-bold font-poppins text-base text-slate-900 leading-snug line-clamp-2">
+                          {camp.title}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                          <Users className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{camp.organizerName}</span>
+                        </p>
                       </div>
-                    </div>
 
-                    <div className="py-3 space-y-2">
-                      <h4 className="text-sm font-bold text-slate-900">{notif.hospitalName}</h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">{notif.messageText}</p>
-
-                      <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                          {notif.distanceKm} km away ({notif.hospitalCity})
-                        </span>
-                        <span>Delivered via: {notif.channel}</span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                      {notif.status === 'SENT' ? (
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          <button
-                            onClick={() => handleRespond(notif.id, 'ACCEPTED')}
-                            className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>I Can Donate (Accept)</span>
-                          </button>
-                          <button
-                            onClick={() => handleRespond(notif.id, 'DECLINED')}
-                            className="flex-1 sm:flex-none px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs transition-colors"
-                          >
-                            Decline
-                          </button>
+                      {/* Location & Time */}
+                      <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2 leading-tight">
+                            {camp.venueName}, {camp.venueAddress}
+                          </span>
                         </div>
+
+                        <div className="flex items-center gap-2 text-slate-700">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-semibold">{camp.startDate}</span>
+                          <span>&bull;</span>
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{camp.startTime} - {camp.endTime}</span>
+                        </div>
+                      </div>
+
+                      {/* Capacity Progress Bar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-slate-500">Reserved Units:</span>
+                          <span className="font-bold text-slate-800">
+                            {camp.registeredCount} / {camp.capacityTarget}
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              percentFull >= 90 ? 'bg-amber-500' : 'bg-blue-600'
+                            }`}
+                            style={{ width: `${percentFull}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Button */}
+                    <div className="pt-4 mt-4 border-t border-slate-100">
+                      {isRegistered ? (
+                        <Link
+                          to="/donor/registrations"
+                          className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>View Digital Pass</span>
+                        </Link>
                       ) : (
-                        <div className="flex items-center gap-2 text-xs font-semibold">
-                          {isAccepted ? (
-                            <span className="flex items-center gap-1 text-emerald-700">
-                              <CheckCircle2 className="w-4 h-4" />
-                              Accepted • Scheduled for emergency screening
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-slate-500">
-                              <XCircle className="w-4 h-4" />
-                              Declined
-                            </span>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSlotModal(camp)}
+                          className={`w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer ${
+                            isFull
+                              ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                              : 'bg-[#C1272D] hover:bg-[#A01F24] text-white'
+                          }`}
+                        >
+                          <span>{isFull ? 'Join Priority Waitlist' : 'Select Time Slot & Register'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                       )}
-
-                      <span className="text-[11px] font-mono text-slate-400">ID: {notif.id}</span>
                     </div>
                   </div>
                 );
@@ -422,7 +367,104 @@ export const DonorPortalPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Time Slot Picker Modal */}
+        {selectedCampaignForSlot && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-xl border border-slate-200 animate-in zoom-in-95">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                    Slot Reservation
+                  </span>
+                  <h3 className="font-bold font-poppins text-lg text-slate-900 mt-1">
+                    {selectedCampaignForSlot.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {selectedCampaignForSlot.venueName} &bull; {selectedCampaignForSlot.startDate}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCampaignForSlot(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                >
+                  <span className="text-xl leading-none">&times;</span>
+                </button>
+              </div>
+
+              {/* Slot Selection Radio Matrix */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-800">
+                  Select Preferred Donation Window:
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    '09:00 - 10:00',
+                    '10:00 - 11:00',
+                    '11:00 - 12:00',
+                    '13:00 - 14:00',
+                    '14:00 - 15:00',
+                    '15:00 - 16:00',
+                  ].map((slot) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setSelectedSlotTime(slot)}
+                      className={`p-3 rounded-xl border text-xs font-mono font-bold text-left transition-all cursor-pointer ${
+                        selectedSlotTime === slot
+                          ? 'border-[#C1272D] bg-red-50/60 text-[#C1272D] shadow-xs ring-1 ring-red-200'
+                          : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="block text-[11px] font-sans text-slate-400 font-normal">Session</span>
+                      <span>{slot}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Donor Summary Pill */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Registered Volunteer:</span>
+                  <span className="font-bold text-slate-800">{donor.fullName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Blood Group:</span>
+                  <span className="font-bold text-red-600">{donor.bloodGroup}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Delivery Channel:</span>
+                  <span className="font-mono text-emerald-700 font-semibold">{donor.preferredChannel}</span>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCampaignForSlot(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmRegistration}
+                  disabled={isRegistering}
+                  className="px-5 py-2.5 rounded-xl bg-[#C1272D] hover:bg-[#A01F24] text-white text-xs font-semibold shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isRegistering ? 'Confirming...' : 'Confirm Reservation'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </DonorLayout>
   );
 };

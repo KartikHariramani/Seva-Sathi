@@ -7,6 +7,7 @@ import { storageAdapter } from '../persistence/localStorageAdapter';
 import { syncEngine } from '../sync/broadcastSync';
 import { localEventBus } from '../sync/localEventBus';
 import { createInitialSeedState } from '../persistence/seedManager';
+import { bloodRequestRepository } from '../services/bloodRequestRepository';
 
 interface AppStoreContextType {
   state: RaktSetuLocalState;
@@ -287,6 +288,8 @@ export const AppStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           newState: { status: 'approved' },
         }
       );
+
+      bloodRequestRepository.updateRequest(target.id, { status: 'approved' }).catch(() => {});
     },
     [state.requests, mutate]
   );
@@ -323,6 +326,8 @@ export const AppStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           newState: { status: 'rejected', reason },
         }
       );
+
+      bloodRequestRepository.updateRequest(target.id, { status: 'rejected' }).catch(() => {});
     },
     [state.requests, mutate]
   );

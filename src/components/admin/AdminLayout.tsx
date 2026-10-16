@@ -34,7 +34,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    document.title = `${pageTitle} | RaktSetu Admin`;
+    document.title = `${pageTitle} | SevaSetu Admin`;
   }, [pageTitle]);
 
   const health = selectNetworkHealth(state);
@@ -155,7 +155,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-poppins font-bold text-base text-slate-900 leading-none">
-                  RaktSetu
+                  SevaSetu
                 </span>
                 <span className="text-[10px] font-mono uppercase tracking-wider font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
                   Command Center

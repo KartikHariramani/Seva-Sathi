@@ -101,7 +101,7 @@ export const RegisterPage: React.FC = () => {
               Register your organization
             </h1>
             <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-              Join the RaktSetu predictive blood network to coordinate inventory and prevent shortages.
+              Join the SevaSetu predictive blood network to coordinate inventory and prevent shortages.
             </p>
           </div>
 

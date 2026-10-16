@@ -1,6 +1,6 @@
 import type { BloodGroup } from './index';
 
-export type OrganizationType = 'hospital' | 'blood_bank';
+export type OrganizationType = 'hospital' | 'blood_bank' | 'ngo';
 export type OrganizationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
 
 export interface OrganizationContact {

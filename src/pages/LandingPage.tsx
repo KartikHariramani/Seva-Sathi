@@ -37,7 +37,7 @@ export const LandingPage: React.FC = () => {
 
           {/* Supporting Text */}
           <p className="max-w-2xl mx-auto text-base sm:text-lg lg:text-xl text-[#64748B] font-normal leading-relaxed text-balance mb-8">
-            RaktSetu predicts demand, detects stockout risk and intelligently coordinates blood inventory across connected hospitals and blood banks.
+            SevaSetu predicts demand, detects stockout risk and intelligently coordinates blood inventory across connected hospitals and blood banks.
           </p>
 
           {/* Action Buttons */}
@@ -48,7 +48,7 @@ export const LandingPage: React.FC = () => {
               onClick={scrollToProblem}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              Explore RaktSetu
+              Explore SevaSetu
             </Button>
             <Link to="/how-it-works">
               <Button variant="secondary" size="lg">
@@ -90,7 +90,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <SectionHeading
             eyebrow="CONTINUOUS COORDINATION"
-            title="How RaktSetu Works"
+            title="How SevaSetu Works"
             description="A four-stage predictive pipeline transforming static blood banks into a synchronized, resilient grid."
             align="center"
           />
@@ -210,7 +210,7 @@ export const LandingPage: React.FC = () => {
             Build a safer blood network.
           </h2>
           <p className="max-w-xl mx-auto text-base sm:text-lg text-[#64748B] mb-10 leading-relaxed text-balance">
-            Connect your hospital or blood bank to RaktSetu.
+            Connect your hospital or blood bank to SevaSetu.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

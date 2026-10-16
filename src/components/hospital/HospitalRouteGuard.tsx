@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Clock } from 'lucide-react';
@@ -10,50 +10,59 @@ interface HospitalRouteGuardProps {
 
 /**
  * Role-aware route guard for Hospital Portal routes
- * Protects hospital command center pages for Hospital Admin and Hospital Staff.
+ * Strict Invariant:
+ * Requires authenticated session. Redirects unauthenticated visitors to /login.
+ * Restricts cross-role access: only hospital and hospital_staff accounts permitted.
  */
 export const HospitalRouteGuard: React.FC<HospitalRouteGuardProps> = ({ children, adminOnly = false }) => {
-  const { user, isAuthenticated, loginWithDemo } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const location = useLocation();
-  const [isInitializing, setIsInitializing] = useState(true);
 
-  useEffect(() => {
-    const wasLoggedOut = sessionStorage.getItem('raktsetu_explicit_logout') === 'true';
-
-    if (!isAuthenticated && !wasLoggedOut) {
-      // Auto-provision demo hospital session
-      loginWithDemo('hospital').then(() => {
-        setIsInitializing(false);
-      });
-    } else {
-      setIsInitializing(false);
-    }
-  }, [isAuthenticated, loginWithDemo]);
-
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-mono text-xs text-slate-500">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#C1272D] animate-ping" />
-          <span>Verifying hospital credentials...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // If not authenticated or not a hospital user/staff
-  const isHospitalRole = user?.role === 'hospital' || user?.role === 'hospital_staff';
-  if (!isAuthenticated || !isHospitalRole) {
+  // 1. Unauthenticated: Redirect to login immediately
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Staff restriction: staff cannot access /hospital/staff (Requirement #22)
-  if (adminOnly && user?.role !== 'hospital') {
+  // 2. Suspended Facility Check
+  if (user.verificationStatus === 'SUSPENDED') {
+    return (
+      <Navigate
+        to="/unauthorized"
+        state={{
+          from: location,
+          requiredRole: 'hospital',
+          attemptedPath: location.pathname,
+        }}
+        replace
+      />
+    );
+  }
+
+  // 3. Role Authorization: must be hospital or hospital_staff (or admin)
+  const isHospitalRole = user.role === 'hospital' || user.role === 'hospital_staff';
+  const isAdmin = user.role === 'admin';
+
+  if (!isHospitalRole && !isAdmin) {
+    return (
+      <Navigate
+        to="/unauthorized"
+        state={{
+          from: location,
+          requiredRole: 'hospital',
+          attemptedPath: location.pathname,
+        }}
+        replace
+      />
+    );
+  }
+
+  // 4. Staff restriction: staff cannot access admin-only hospital routes (e.g., /hospital/staff)
+  if (adminOnly && user.role === 'hospital_staff') {
     return <Navigate to="/hospital/staff/dashboard" replace />;
   }
 
-  // Unverified hospital restriction: cannot create network blood requests (Requirement #10 & #77)
-  if (location.pathname === '/hospital/requests/new' && user?.verificationStatus === 'PENDING') {
+  // 5. Unverified hospital restriction: cannot create network blood requests
+  if (location.pathname === '/hospital/requests/new' && user.verificationStatus === 'PENDING') {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 font-inter">
         <div className="max-w-md w-full bg-white border border-amber-200 rounded-2xl p-6 shadow-md text-center space-y-4">
@@ -69,9 +78,9 @@ export const HospitalRouteGuard: React.FC<HospitalRouteGuardProps> = ({ children
           </p>
           <a
             href="/hospital/dashboard"
-            className="inline-block px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+            className="inline-block text-xs font-semibold text-[#1E4C8A] hover:underline"
           >
-            Return to Hospital Dashboard
+            &larr; Return to Hospital Command Center
           </a>
         </div>
       </div>

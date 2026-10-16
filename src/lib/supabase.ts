@@ -30,7 +30,7 @@ export interface SupabaseUserProfile {
   id: string;
   email: string;
   full_name: string;
-  role: 'ADMIN' | 'HOSPITAL' | 'BLOOD_BANK' | 'HOSPITAL_STAFF';
+  role: 'ADMIN' | 'HOSPITAL' | 'BLOOD_BANK' | 'HOSPITAL_STAFF' | 'NGO' | 'DONOR';
   organization_id: string | null;
   staff_title?: string;
   status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
@@ -75,6 +75,24 @@ export const DEMO_IDENTITIES = {
     name: 'Suresh Nair',
     orgId: 'ORG-BANK-01',
     orgName: 'Central City Blood Bank & Apheresis Depot',
+    verificationStatus: 'VERIFIED' as OrganizationStatus,
+  },
+  NGO: {
+    email: 'ngo.coordinator@sevasathi.org',
+    password: 'demoNgoPass2026!',
+    role: 'ngo' as UserRole,
+    name: 'Anjali Sharma',
+    orgId: 'ORG-NGO-01',
+    orgName: 'LifeStream Red Cross NGO Alliance',
+    verificationStatus: 'VERIFIED' as OrganizationStatus,
+  },
+  DONOR: {
+    email: 'donor@sevasathi.org',
+    password: 'demoDonorPass2026!',
+    role: 'donor' as UserRole,
+    name: 'Amitabh Sen',
+    orgId: 'DNR-2026-001',
+    orgName: 'Volunteer Blood Donor Network',
     verificationStatus: 'VERIFIED' as OrganizationStatus,
   },
 };

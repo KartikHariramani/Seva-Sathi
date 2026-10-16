@@ -21,7 +21,6 @@ import {
   Globe,
   Clock,
   UploadCloud,
-  Heart,
 } from 'lucide-react';
 
 interface HospitalLayoutProps {
@@ -88,13 +87,6 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
       activeMatch: (pathname: string) => pathname.startsWith('/hospital/requests'),
     },
     {
-      label: 'Donor Network',
-      path: '/donor/portal',
-      icon: Heart,
-      enabled: true,
-      activeMatch: (pathname: string) => pathname.startsWith('/donor'),
-    },
-    {
       label: 'Predictions',
       path: '/hospital/predictions',
       icon: LineChart,
@@ -158,7 +150,7 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
             </div>
             <div className="flex flex-col">
               <span className="font-poppins font-bold text-lg tracking-tight text-[#0F172A] leading-tight flex items-center gap-1.5">
-                Seva Sathi
+                SevaSetu
               </span>
               <span className="text-[10px] font-mono text-[#1E4C8A]">Coordination Hub</span>
             </div>
@@ -266,7 +258,7 @@ export const HospitalLayout: React.FC<HospitalLayoutProps> = ({ children, pageTi
               />
             </svg>
           </div>
-          <span className="font-poppins font-bold text-base text-[#0F172A]">Seva Sathi</span>
+          <span className="font-poppins font-bold text-base text-[#0F172A]">SevaSetu</span>
         </Link>
 
         <div className="flex items-center gap-3">

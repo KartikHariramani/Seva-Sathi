@@ -15,6 +15,7 @@ import {
 } from '../components/hospital/HospitalSkeletons';
 import { usePredictions } from '../hooks/usePredictions';
 import { SmartStockoutAlert } from '../components/intelligence/SmartStockoutAlert';
+import { ShortageBuzzerBanner } from '../components/alerts/ShortageBuzzerBanner';
 import type { HospitalInventoryItem } from '../data/hospitalInventory';
 import {
   CheckCircle2,
@@ -103,6 +104,14 @@ export const HospitalDashboardPage: React.FC = () => {
               </Link>
             </div>
           </div>
+
+          {/* Emergency Shortage Buzzer & Alert Banner */}
+          <ShortageBuzzerBanner
+            facilityId="HOSP-001"
+            onNavigateToReplenish={() => {
+              if (criticalItems[0]) handleOpenGroupDetails(criticalItems[0]);
+            }}
+          />
 
           {/* 2. LEVEL 1: ATTENTION BANNER (Section 9 & 10) */}
           <AttentionBanner

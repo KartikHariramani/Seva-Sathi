@@ -210,7 +210,7 @@ export const CreateBloodRequestPage: React.FC = () => {
                 Create Blood Request
               </h2>
               <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
-                Requisition blood units across the RaktSetu hospital and blood bank network.
+                Requisition blood units across the SevaSetu hospital and blood bank network.
               </p>
             </div>
 

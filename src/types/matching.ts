@@ -21,6 +21,7 @@ export interface BloodBank {
   responseTimeMinutes: number;
   networkDemand: 'Low' | 'Moderate' | 'High';
   inventories: Record<BloodGroup, BloodBankInventory>;
+  coordinates?: { lat: number; lng: number };
 }
 
 export interface BloodBankMatch {
@@ -39,6 +40,14 @@ export interface BloodBankMatch {
   };
 }
 
+export interface ExcludedFacility {
+  bankId: string;
+  bankName: string;
+  distanceKm: number;
+  reasonCode: 'OUTSIDE_RADIUS' | 'INCOMPATIBLE_GROUP' | 'INSUFFICIENT_STOCK' | 'UNVERIFIED' | 'STALE_DATA' | 'CRITICAL_SHORTAGE';
+  detail: string;
+}
+
 export interface MatchingResult {
   requestId: string;
   bloodGroup: BloodGroup;
@@ -46,4 +55,9 @@ export interface MatchingResult {
   primaryMatch: BloodBankMatch | null;
   alternatives: BloodBankMatch[];
   evaluatedAt: string;
+  searchRadiusKm?: number;
+  searchStage?: 'LOCAL_20KM' | 'DISTRICT_40KM' | 'REGIONAL_60KM' | 'MAX_REACHED';
+  totalEligibleSupply?: number;
+  shortageSummary?: string | null;
+  excludedFacilities?: ExcludedFacility[];
 }

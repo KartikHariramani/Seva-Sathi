@@ -60,6 +60,14 @@ import { NearExpiryRescuePage } from './pages/nearexpiry/NearExpiryRescuePage';
 import { SmartInventoryImportPage } from './pages/inventory/SmartInventoryImportPage';
 import { LiveInventoryNetworkPage } from './pages/network/LiveInventoryNetworkPage';
 import { DonorPortalPage } from './pages/donor/DonorPortalPage';
+import { DonorRegistrationsPage } from './pages/donor/DonorRegistrationsPage';
+import { DonorNotificationsPage } from './pages/donor/DonorNotificationsPage';
+import { NGOCampaignsPage } from './pages/ngo/NGOCampaignsPage';
+import { NGORouteGuard } from './components/ngo/NGORouteGuard';
+import { DonorRouteGuard } from './components/donor/DonorRouteGuard';
+import { UnauthorizedPage } from './pages/UnauthorizedPage';
+import { OrganizerTelemetryPage } from './pages/organizer/OrganizerTelemetryPage';
+import { SevaSathiAIAssistant } from './components/ai/SevaSathiAIAssistant';
 
 export function App() {
   return (
@@ -214,6 +222,30 @@ export function App() {
                     </BloodBankRouteGuard>
                   }
                 />
+                <Route
+                  path="/blood-bank/near-expiry"
+                  element={
+                    <BloodBankRouteGuard>
+                      <Layout>
+                        <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                          <NearExpiryRescuePage />
+                        </div>
+                      </Layout>
+                    </BloodBankRouteGuard>
+                  }
+                />
+                <Route
+                  path="/blood-bank/inventory"
+                  element={
+                    <BloodBankRouteGuard>
+                      <Layout>
+                        <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                          <SmartInventoryImportPage />
+                        </div>
+                      </Layout>
+                    </BloodBankRouteGuard>
+                  }
+                />
                 {/* Phase 6: Admin Network Command Center Routes (Admin Layout + Admin Route Guard) */}
                 <Route
                   path="/admin/command-center"
@@ -320,32 +352,116 @@ export function App() {
               <Route
                 path="/near-expiry"
                 element={
-                  <Layout>
-                    <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
-                      <NearExpiryRescuePage />
-                    </div>
-                  </Layout>
+                  <BloodBankRouteGuard>
+                    <Layout>
+                      <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                        <NearExpiryRescuePage />
+                      </div>
+                    </Layout>
+                  </BloodBankRouteGuard>
                 }
               />
               <Route
                 path="/donor/portal"
                 element={
+                  <DonorRouteGuard>
+                    <DonorPortalPage />
+                  </DonorRouteGuard>
+                }
+              />
+              <Route
+                path="/donor/drives"
+                element={
+                  <DonorRouteGuard>
+                    <DonorPortalPage />
+                  </DonorRouteGuard>
+                }
+              />
+              <Route
+                path="/donor/registrations"
+                element={
+                  <DonorRouteGuard>
+                    <DonorRegistrationsPage />
+                  </DonorRouteGuard>
+                }
+              />
+              <Route
+                path="/donor/passes"
+                element={
+                  <DonorRouteGuard>
+                    <DonorRegistrationsPage />
+                  </DonorRouteGuard>
+                }
+              />
+              <Route
+                path="/donor/notifications"
+                element={
+                  <DonorRouteGuard>
+                    <DonorNotificationsPage />
+                  </DonorRouteGuard>
+                }
+              />
+              <Route
+                path="/ngo/campaigns"
+                element={
+                  <NGORouteGuard>
+                    <Layout>
+                      <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                        <NGOCampaignsPage />
+                      </div>
+                    </Layout>
+                  </NGORouteGuard>
+                }
+              />
+              <Route
+                path="/campaigns"
+                element={
                   <Layout>
                     <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
-                      <DonorPortalPage />
+                      <NGOCampaignsPage />
                     </div>
                   </Layout>
                 }
               />
               <Route
+                path="/organizer/telemetry"
+                element={
+                  <NGORouteGuard>
+                    <Layout>
+                      <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                        <OrganizerTelemetryPage />
+                      </div>
+                    </Layout>
+                  </NGORouteGuard>
+                }
+              />
+              <Route
+                path="/telemetry"
+                element={
+                  <NGORouteGuard>
+                    <Layout>
+                      <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                        <OrganizerTelemetryPage />
+                      </div>
+                    </Layout>
+                  </NGORouteGuard>
+                }
+              />
+              <Route
                 path="/inventory/import"
                 element={
-                  <Layout>
-                    <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
-                      <SmartInventoryImportPage />
-                    </div>
-                  </Layout>
+                  <BloodBankRouteGuard>
+                    <Layout>
+                      <div className="pt-24 pb-16 px-4 max-w-7xl mx-auto">
+                        <SmartInventoryImportPage />
+                      </div>
+                    </Layout>
+                  </BloodBankRouteGuard>
                 }
+              />
+              <Route
+                path="/unauthorized"
+                element={<UnauthorizedPage />}
               />
               <Route
                 path="/about"
@@ -403,6 +519,7 @@ export function App() {
               {/* Fallback unknown routes */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <SevaSathiAIAssistant />
           </HospitalRequestProvider>
         </HospitalInventoryProvider>
       </RegistrationProvider>

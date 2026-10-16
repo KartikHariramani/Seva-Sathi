@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useAppStore } from '../../store/appStore';
+import { campaignService } from '../../services/campaignService';
+import { syncEngine } from '../../sync/broadcastSync';
 import {
   selectTotalNetworkStock,
   selectAvailableNetworkStock,
@@ -23,11 +25,51 @@ import {
   Truck,
   ArrowRight,
   ExternalLink,
+  Users,
+  Calendar,
 } from 'lucide-react';
+import { localEventBus } from '../../sync/localEventBus';
 
 export const AdminCommandCenterPage: React.FC = () => {
   const { state, acknowledgeAlert, resolveAlert } = useAppStore();
   const [selectedTopologyNode, setSelectedTopologyNode] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState(() => campaignService.getCampaigns());
+  const [registrations, setRegistrations] = useState(() => campaignService.getRegistrations());
+
+  useEffect(() => {
+    const refreshCampaignData = () => {
+      setCampaigns(campaignService.getCampaigns());
+      setRegistrations(campaignService.getRegistrations());
+    };
+
+    const unsubSync = syncEngine.subscribe((event) => {
+      if (
+        event.type.includes('campaign') ||
+        event.type.includes('registration') ||
+        event.type.includes('CAMPAIGN') ||
+        event.type.includes('DONOR')
+      ) {
+        refreshCampaignData();
+      }
+    });
+
+    const unsubLocal1 = localEventBus.on('campaign.created', refreshCampaignData);
+    const unsubLocal2 = localEventBus.on('campaign.registered', refreshCampaignData);
+    const unsubLocal3 = localEventBus.on('campaign.cancelled', refreshCampaignData);
+    const unsubLocal4 = localEventBus.on('campaign.checked_in', refreshCampaignData);
+
+    const handleFocus = () => refreshCampaignData();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      unsubSync();
+      unsubLocal1();
+      unsubLocal2();
+      unsubLocal3();
+      unsubLocal4();
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const totalStock = selectTotalNetworkStock(state);
   const availStock = selectAvailableNetworkStock(state);
@@ -43,6 +85,10 @@ export const AdminCommandCenterPage: React.FC = () => {
   const flowMetrics = selectNetworkFlowMetrics(state);
 
   const activeAlerts = state.alerts.filter((a) => a.status === 'ACTIVE');
+
+  const totalDonorsRegistered = registrations.length;
+  const verifiedTurnout = registrations.filter((r) => r.status === 'ATTENDED').length;
+  const publishedDrives = campaigns.filter((c) => c.status === 'ACTIVE').length;
 
   return (
     <AdminLayout pageTitle="Network Command Center">
@@ -698,6 +744,92 @@ export const AdminCommandCenterPage: React.FC = () => {
                 {flowMetrics.transfersDelivered}
               </strong>
               <span className="text-[10px] text-slate-400">Ingested</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. COMMUNITY & NSS DONATION DRIVE REAL-TIME OPERATIONS */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-semibold border border-emerald-200 uppercase">
+                  Community Telemetry
+                </span>
+              </div>
+              <h3 className="font-poppins font-bold text-lg text-slate-900 mt-1">
+                NSS Organization & Public Blood Drives
+              </h3>
+              <p className="text-xs text-slate-500">
+                Synchronized live telemetry across NGO camp organizers, donor digital registrations, and QR-verified clinic check-ins.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/ngo/campaigns"
+                className="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
+              >
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <span>All Drives ({campaigns.length})</span>
+              </Link>
+              <Link
+                to="/organizer/telemetry"
+                className="text-xs font-semibold text-white bg-[#1E4C8A] hover:bg-[#163866] px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Live Organizer Telemetry</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                Active Drives
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <strong className="font-poppins font-bold text-2xl text-slate-900">{publishedDrives}</strong>
+                <span className="text-[11px] text-slate-400 font-mono">/ {campaigns.length} total</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Live in Donor Portal</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                Total Donor Signups
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <strong className="font-poppins font-bold text-2xl text-[#1E4C8A]">{totalDonorsRegistered}</strong>
+                <span className="text-[11px] text-slate-400 font-mono">registrations</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Auto-synced across tabs</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                Verified Check-ins
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <strong className="font-poppins font-bold text-2xl text-emerald-600">{verifiedTurnout}</strong>
+                <span className="text-[11px] text-emerald-600 font-mono">
+                  {totalDonorsRegistered > 0 ? `(${Math.round((verifiedTurnout / totalDonorsRegistered) * 100)}%)` : '(0%)'}
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">QR code pass validated</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                Network Participation
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <strong className="font-poppins font-bold text-2xl text-purple-600">
+                  {new Set(campaigns.map((c) => c.organizerId || c.city)).size}
+                </strong>
+                <span className="text-[11px] text-slate-400 font-mono">NGO / NSS Units</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">State coordination nodes</span>
             </div>
           </div>
         </div>

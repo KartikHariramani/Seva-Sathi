@@ -15,6 +15,7 @@ import type { BloodComponent } from '../../types/nearExpiry';
 import type { Organization } from '../../types/organization';
 import { INITIAL_ORGANIZATIONS } from '../../persistence/seedManager';
 import { calculateHaversineDistance } from '../../lib/supabase';
+import { LeafletFacilityMap } from '../../components/network/LeafletFacilityMap';
 
 export type SyncIntegrityStatus =
   | 'LIVE_INTEGRATED'
@@ -51,6 +52,8 @@ export const LiveInventoryNetworkPage: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<string>('ALL');
   const [onlyVerified, setOnlyVerified] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'both' | 'map' | 'list'>('both');
 
   const bloodGroupOptions: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   const componentOptions: BloodComponent[] = [
@@ -337,17 +340,95 @@ export const LiveInventoryNetworkPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Results Header */}
-      <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-        <span>
-          Found {filteredBanks.length} connected blood bank{filteredBanks.length === 1 ? '' : 's'} with compatible stock
-        </span>
-        <span>Reference Location: Nagpur Trauma Corridor (21.128, 79.098)</span>
+      {/* View Mode Switcher & Results Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="text-slate-600 font-mono flex items-center gap-2">
+          <span className="font-semibold text-slate-800">
+            {filteredBanks.length} Facilities
+          </span>
+          <span>with usable stock</span>
+          <span className="text-slate-400">| Reference: Nagpur Apex (21.128, 79.098)</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+          <button
+            onClick={() => setViewMode('both')}
+            className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              viewMode === 'both' ? 'bg-white shadow-xs text-slate-900 font-semibold' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Map + List
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              viewMode === 'map' ? 'bg-white shadow-xs text-slate-900 font-semibold' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Map Only
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              viewMode === 'list' ? 'bg-white shadow-xs text-slate-900 font-semibold' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            List Only
+          </button>
+        </div>
       </div>
 
-      {/* Blood Bank Cards Grid */}
+      {/* Interactive Leaflet Geographic Map View */}
+      {(viewMode === 'both' || viewMode === 'map') && (
+        <LeafletFacilityMap
+          facilities={[
+            ...filteredBanks.map((b) => ({
+              id: b.id,
+              name: b.name,
+              code: b.code,
+              type: 'blood_bank' as const,
+              city: b.city,
+              address: b.address,
+              phone: b.phone,
+              coordinates: b.coordinates,
+              verified: b.verified,
+              distanceKm: b.distanceKm,
+              availableStock: selectedGroup !== 'ALL' ? b.inventory[selectedGroup as BloodGroup] || 0 : Object.values(b.inventory).reduce((x, y) => x + y, 0),
+              syncStatus: b.syncStatus,
+              lastUpdatedMinutesAgo: b.lastUpdatedMinutesAgo,
+            })),
+            ...INITIAL_ORGANIZATIONS.filter((o) => o.type === 'hospital').map((h, idx) => ({
+              id: h.id,
+              name: h.name,
+              code: h.code,
+              type: 'hospital' as const,
+              city: h.location.city,
+              address: h.location.address,
+              phone: h.contact.primaryPhone,
+              coordinates: h.location.coordinates,
+              verified: h.status === 'VERIFIED',
+              distanceKm: calculateHaversineDistance(
+                21.128,
+                79.098,
+                h.location.coordinates?.lat || 21.1458,
+                h.location.coordinates?.lng || 79.0882
+              ),
+              availableStock: Math.round(h.stats.totalInventoryUnits),
+              syncStatus: 'LIVE_INTEGRATED',
+              lastUpdatedMinutesAgo: idx * 6 + 3,
+            })),
+          ]}
+          selectedGroup={selectedGroup}
+          selectedFacilityId={selectedFacilityId}
+          onSelectFacility={(fac) => setSelectedFacilityId(fac.id)}
+        />
+      )}
+
+      {/* Blood Bank Cards Grid (Synchronized List View) */}
+      {(viewMode === 'both' || viewMode === 'list') && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredBanks.map((bank) => {
+          const isSelected = selectedFacilityId === bank.id;
           const groupStock =
             selectedGroup !== 'ALL'
               ? bank.inventory[selectedGroup as BloodGroup] || 0
@@ -356,7 +437,9 @@ export const LiveInventoryNetworkPage: React.FC = () => {
           return (
             <div
               key={bank.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+              className={`bg-white rounded-2xl border transition-all overflow-hidden flex flex-col justify-between ${
+                isSelected ? 'border-[#38BDF8] ring-2 ring-[#38BDF8]/40 shadow-lg' : 'border-slate-200 shadow-sm hover:shadow-md'
+              }`}
             >
               <div>
                 {/* Header with Sync Badge */}
@@ -443,6 +526,7 @@ export const LiveInventoryNetworkPage: React.FC = () => {
           );
         })}
       </div>
+      )}
     </div>
   );
 };

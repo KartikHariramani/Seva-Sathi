@@ -14,6 +14,9 @@ import { bloodRequestRepository } from '../services/bloodRequestRepository';
 import { useAuth } from './AuthContext';
 import { useRegistration } from './RegistrationContext';
 import { isRequestActive } from '../utils/requestStatus';
+import { unifiedTelegramNotificationService } from '../services/unifiedTelegramNotificationService';
+import { localEventBus } from '../sync/localEventBus';
+import { syncEngine } from '../sync/broadcastSync';
 
 interface HospitalRequestContextType {
   requests: BloodRequest[];
@@ -71,6 +74,41 @@ export const HospitalRequestProvider: React.FC<{ children: React.ReactNode }> = 
 
   useEffect(() => {
     fetchRequests();
+
+    const unsub1 = localEventBus.on('REQUEST_CREATED', () => fetchRequests());
+    const unsub2 = localEventBus.on('REQUEST_UPDATED', () => fetchRequests());
+    const unsub3 = localEventBus.on('RESERVATION_CREATED', () => fetchRequests());
+    const unsub4 = localEventBus.on('TRANSFER_UPDATED', () => fetchRequests());
+    const unsub5 = localEventBus.on('hospital.request.created', () => fetchRequests());
+    const unsub6 = localEventBus.on('hospital.request.updated', () => fetchRequests());
+    const unsub7 = syncEngine.subscribe((msg) => {
+      if (
+        msg.type === 'REQUEST_CREATED' ||
+        msg.type === 'REQUEST_UPDATED' ||
+        msg.type === 'RESERVATION_CREATED' ||
+        msg.type === 'TRANSFER_UPDATED'
+      ) {
+        fetchRequests();
+      }
+    });
+
+    const handleFocus = () => fetchRequests();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+    }
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      unsub5();
+      unsub6();
+      unsub7();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+      }
+    };
   }, [fetchRequests]);
 
   // Derived KPI metrics
@@ -113,6 +151,19 @@ export const HospitalRequestProvider: React.FC<{ children: React.ReactNode }> = 
       try {
         const created = await bloodRequestRepository.createRequest(input, hospitalContext);
         setRequests((prev) => [created, ...prev]);
+
+        // Trigger automatic Telegram dispatch to regional blood-bank and hospital coordinators
+        unifiedTelegramNotificationService.notifyHospitalBloodRequest({
+          requestId: created.id,
+          displayId: created.displayId || created.id,
+          hospitalName: created.hospitalName || hospitalContext.hospitalName,
+          bloodGroup: created.bloodGroup,
+          quantityLitres: created.quantityLitres,
+          priority: created.priority,
+          status: created.status,
+        }).catch((err) => console.warn('[Telegram Dispatch] Hospital request alert failed:', err));
+
+        localEventBus.emit('hospital.request.created', { request: created });
         return created;
       } catch (err) {
         console.error('Failed to create blood request', err);

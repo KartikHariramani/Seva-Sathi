@@ -117,7 +117,7 @@ export const ProblemComparison: React.FC = () => {
           <span>The Equilibrium Solution</span>
         </div>
         <h4 className="font-poppins font-semibold text-xl sm:text-2xl text-white mb-2">
-          RaktSetu connects both sides.
+          SevaSetu connects both sides.
         </h4>
         <p className="text-sm text-slate-300 font-normal leading-relaxed text-balance">
           Eliminating the information silos between consumption centers and storage facilities through predictive load-balancing.

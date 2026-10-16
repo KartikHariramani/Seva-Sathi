@@ -162,14 +162,14 @@ export const NetworkMapDiagram: React.FC<NetworkMapDiagramProps> = ({ interactiv
               ))}
             </div>
 
-            {/* Central RaktSetu Hub Node */}
+            {/* Central SevaSetu Hub Node */}
             <div className="relative z-20 flex flex-col items-center">
               <div className="w-16 h-16 rounded-full bg-[#0F172A] border-2 border-slate-700 shadow-premium flex flex-col items-center justify-center text-white">
                 <span className="text-[10px] font-mono text-red-400 font-bold">CORE</span>
                 <span className="text-[8px] font-mono text-slate-300">HUB</span>
               </div>
               <span className="text-[10px] font-mono text-slate-600 font-semibold mt-1">
-                RaktSetu
+                SevaSetu
               </span>
             </div>
 

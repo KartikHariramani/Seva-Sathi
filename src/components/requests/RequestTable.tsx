@@ -75,7 +75,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({
           No blood requests yet
         </h4>
         <p className="text-xs sm:text-sm text-[#64748B] mt-1 max-w-sm mx-auto">
-          Create your first request to coordinate blood inventory with connected banks across the RaktSetu network.
+          Create your first request to coordinate blood inventory with connected banks across the SevaSetu network.
         </p>
         {onCreateNew && (
           <button

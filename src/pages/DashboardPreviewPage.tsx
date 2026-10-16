@@ -71,7 +71,7 @@ export const DashboardPreviewPage: React.FC = () => {
           WORKSPACE STAGING
         </span>
         <h1 className="font-poppins font-bold text-3xl sm:text-4xl text-[#0F172A] tracking-tight mb-4">
-          Your RaktSetu dashboard is coming next.
+          Your SevaSetu dashboard is coming next.
         </h1>
         <p className="text-sm sm:text-base text-[#64748B] leading-relaxed text-balance">
           The Phase 1 foundation is complete. In Phase 2, this workspace connects directly to the live PostgreSQL / Supabase cluster, machine learning forecast engine, and inter-hospital exchange protocol.
@@ -191,7 +191,7 @@ export const DashboardPreviewPage: React.FC = () => {
       <div className="text-center pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-center gap-4">
         <Link to="/">
           <Button variant="secondary" size="md">
-            Back to RaktSetu Homepage
+            Back to SevaSetu Homepage
           </Button>
         </Link>
         <Link to="/hospital/dashboard">

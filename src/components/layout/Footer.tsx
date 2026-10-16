@@ -11,7 +11,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#C1272D]" />
               <span className="font-poppins font-bold text-xl tracking-tight text-[#0F172A]">
-                RaktSetu
+                SevaSetu
               </span>
             </div>
             <p className="text-sm font-medium text-[#64748B]">
@@ -48,7 +48,7 @@ export const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
           <div>
-            © 2026 RaktSetu. All rights reserved.
+            © 2026 SevaSetu. All rights reserved.
           </div>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />

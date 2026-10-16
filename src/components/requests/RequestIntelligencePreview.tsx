@@ -28,7 +28,7 @@ export const RequestIntelligencePreview: React.FC<RequestIntelligencePreviewProp
       </div>
 
       <p className="text-xs text-[#64748B] leading-relaxed mb-3">
-        Once automated prediction is enabled, RaktSetu will dynamically evaluate:
+        Once automated prediction is enabled, SevaSetu will dynamically evaluate:
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-slate-600">

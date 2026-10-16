@@ -6,6 +6,10 @@ import { useHospitalInventory } from '../../context/HospitalInventoryContext';
 import { useRegistration } from '../../context/RegistrationContext';
 import { useAuth } from '../../context/AuthContext';
 import { validateBloodRequest, validateSingleField } from '../../utils/requestValidation';
+import {
+  calculateUrgencyDeadline,
+  getDefaultClinicalReason,
+} from '../../utils/urgencyPolicy';
 import { RequestIntelligencePreview } from './RequestIntelligencePreview';
 import { Button } from '../common/Button';
 import {
@@ -45,28 +49,18 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   const orgName = regData.organizationName || user?.orgName || 'XYZ Hospital';
   const orgCity = regData.city ? `${regData.city}, Maharashtra` : 'Nagpur, Maharashtra';
 
-  // Default Required By: 4 hours from now
-  const [defaultTime] = useState(() => {
-    const d = new Date(Date.now() + 4 * 60 * 60 * 1000);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  });
-
   // Form State
+  const initialPriority = initialValues?.priority || 'emergency';
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | ''>(initialValues?.bloodGroup || 'O+');
   const [quantity, setQuantity] = useState<string>(
     initialValues?.quantityLitres !== undefined ? initialValues.quantityLitres.toString() : '2.0'
   );
-  const [priority, setPriority] = useState<RequestPriority>(initialValues?.priority || 'emergency');
+  const [priority, setPriority] = useState<RequestPriority>(initialPriority);
   const [requiredBy, setRequiredBy] = useState<string>(
-    initialValues?.requiredBy || defaultTime
+    initialValues?.requiredBy || calculateUrgencyDeadline(initialPriority)
   );
   const [reason, setReason] = useState<string>(
-    initialValues?.reason || 'Multiple trauma surgical prep; massive transfusion protocol standby.'
+    initialValues?.reason || getDefaultClinicalReason(initialPriority)
   );
 
   // Delivery details customization
@@ -99,8 +93,8 @@ export const RequestForm: React.FC<RequestFormProps> = ({
       bloodGroup: bloodGroup ? (bloodGroup as BloodGroup) : undefined,
       quantityLitres: parsedQty,
       priority,
-      requiredBy,
-      reason,
+      requiredBy: requiredBy || calculateUrgencyDeadline(priority),
+      reason: reason.trim() || getDefaultClinicalReason(priority),
     });
     setErrors(res.errors);
     return res.isValid;
@@ -110,16 +104,38 @@ export const RequestForm: React.FC<RequestFormProps> = ({
     setTouched((prev) => ({ ...prev, [field]: true }));
     const errorMsg = validateSingleField(
       field as keyof CreateBloodRequestInput,
-      field === 'quantityLitres' ? parsedQty : field === 'reason' ? reason : requiredBy,
+      field === 'quantityLitres' ? parsedQty : field === 'bloodGroup' ? bloodGroup : priority,
       {
         bloodGroup: bloodGroup ? (bloodGroup as BloodGroup) : undefined,
         quantityLitres: parsedQty,
         priority,
-        requiredBy,
-        reason,
+        requiredBy: requiredBy || calculateUrgencyDeadline(priority),
+        reason: reason.trim() || getDefaultClinicalReason(priority),
       }
     );
     setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  /**
+   * Automatically calculates and sets the required-by time and clinical protocol reason based on urgency policy:
+   * - Emergency: exactly 1 hour from current time
+   * - Urgent: 2 hours from current time
+   * - Routine: 24 hours standard fulfillment window
+   */
+  const handlePrioritySelect = (newPriority: RequestPriority) => {
+    setPriority(newPriority);
+    setIsDirty(true);
+
+    const calculatedDeadline = calculateUrgencyDeadline(newPriority);
+    setRequiredBy(calculatedDeadline);
+    setReason(getDefaultClinicalReason(newPriority));
+
+    setErrors((prev) => ({
+      ...prev,
+      priority: undefined,
+      requiredBy: undefined,
+      reason: undefined,
+    }));
   };
 
   const handleQuantityPreset = (amount: number) => {
@@ -129,27 +145,12 @@ export const RequestForm: React.FC<RequestFormProps> = ({
     setErrors((prev) => ({ ...prev, quantityLitres: undefined }));
   };
 
-  const handleTimePreset = (hoursFromNow: number) => {
-    const d = new Date(Date.now() + hoursFromNow * 60 * 60 * 1000);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    setRequiredBy(`${year}-${month}-${day}T${hours}:${minutes}`);
-    setIsDirty(true);
-    setTouched((prev) => ({ ...prev, requiredBy: true }));
-    setErrors((prev) => ({ ...prev, requiredBy: undefined }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({
       bloodGroup: true,
       quantityLitres: true,
       priority: true,
-      requiredBy: true,
-      reason: true,
     });
 
     if (!validateCurrentForm()) {
@@ -158,12 +159,22 @@ export const RequestForm: React.FC<RequestFormProps> = ({
 
     if (!bloodGroup) return;
 
+    // Emergency deadline automation: ensure fresh deadline strictly conforms to urgency policy
+    let finalDeadline = requiredBy || calculateUrgencyDeadline(priority);
+    const parsedTarget = new Date(finalDeadline).getTime();
+    if (isNaN(parsedTarget) || parsedTarget <= Date.now()) {
+      finalDeadline = calculateUrgencyDeadline(priority);
+      setRequiredBy(finalDeadline);
+    }
+
+    const finalReason = reason.trim() || getDefaultClinicalReason(priority);
+
     await onSubmit({
       bloodGroup: bloodGroup as BloodGroup,
       quantityLitres: parsedQty,
       priority,
-      requiredBy,
-      reason: reason.trim(),
+      requiredBy: finalDeadline,
+      reason: finalReason,
       deliveryLocation,
       department,
       contactPhone,
@@ -177,12 +188,15 @@ export const RequestForm: React.FC<RequestFormProps> = ({
       return;
     }
 
+    const finalDeadline = requiredBy || calculateUrgencyDeadline(priority);
+    const finalReason = reason.trim() || getDefaultClinicalReason(priority);
+
     await onSaveDraft({
       bloodGroup: bloodGroup as BloodGroup,
       quantityLitres: parsedQty || 1.0,
       priority,
-      requiredBy,
-      reason: reason.trim(),
+      requiredBy: finalDeadline,
+      reason: finalReason,
       deliveryLocation,
       department,
       contactPhone,
@@ -395,11 +409,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           {/* Routine */}
           <button
             type="button"
-            onClick={() => {
-              setPriority('routine');
-              setIsDirty(true);
-              setErrors((prev) => ({ ...prev, priority: undefined }));
-            }}
+            onClick={() => handlePrioritySelect('routine')}
             className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
               priority === 'routine'
                 ? 'bg-blue-50/60 border-[#1E4C8A] shadow-xs ring-2 ring-[#1E4C8A]/20'
@@ -418,18 +428,14 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </div>
             <p className="text-xs font-semibold text-slate-600 mb-1">Planned requirement</p>
             <p className="text-[11px] text-slate-400 leading-tight">
-              Elective surgeries or scheduled therapeutic transfusions.
+              Elective surgeries or scheduled therapeutic transfusions (24h fulfillment).
             </p>
           </button>
 
           {/* Urgent */}
           <button
             type="button"
-            onClick={() => {
-              setPriority('urgent');
-              setIsDirty(true);
-              setErrors((prev) => ({ ...prev, priority: undefined }));
-            }}
+            onClick={() => handlePrioritySelect('urgent')}
             className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
               priority === 'urgent'
                 ? 'bg-amber-50/70 border-amber-500 shadow-xs ring-2 ring-amber-500/20'
@@ -448,18 +454,14 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </div>
             <p className="text-xs font-semibold text-slate-600 mb-1">Needed soon</p>
             <p className="text-[11px] text-slate-400 leading-tight">
-              Active surgical cases or acute inpatient stabilization within 2&ndash;6 hrs.
+              Active surgical cases or acute inpatient stabilization within 2 hrs.
             </p>
           </button>
 
           {/* Emergency */}
           <button
             type="button"
-            onClick={() => {
-              setPriority('emergency');
-              setIsDirty(true);
-              setErrors((prev) => ({ ...prev, priority: undefined }));
-            }}
+            onClick={() => handlePrioritySelect('emergency')}
             className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
               priority === 'emergency'
                 ? 'bg-rose-50/70 border-[#C1272D] shadow-xs ring-2 ring-[#C1272D]/20'
@@ -478,10 +480,74 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </div>
             <p className="text-xs font-semibold text-[#C1272D] mb-1">Immediate requirement</p>
             <p className="text-[11px] text-slate-400 leading-tight">
-              Massive hemorrhage, severe trauma resuscitation, or ruptured aneurysm.
+              Massive hemorrhage, trauma resuscitation, required within exactly 1 hr.
             </p>
           </button>
         </div>
+
+        {/* Urgency Policy SLA Banner */}
+        {priority === 'emergency' && (
+          <div className="mt-3.5 p-3.5 rounded-xl border border-rose-200 bg-rose-50/90 flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
+            <div className="w-6 h-6 rounded-md bg-[#C1272D] text-white flex items-center justify-center shrink-0 mt-0.5">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-poppins font-semibold text-xs text-[#C1272D]">
+                  Emergency request: required within 1 hour.
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-200/80 text-rose-800 rounded font-bold uppercase tracking-wider">
+                  SLA Enforced
+                </span>
+              </div>
+              <p className="text-[11px] text-rose-800 mt-1 leading-relaxed">
+                The arrival deadline is automatically computed for exactly 1 hour from current time ({new Date(requiredBy).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Emergency medical couriers and dispatchers prioritize this requisition instantly upon submission.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {priority === 'urgent' && (
+          <div className="mt-3.5 p-3.5 rounded-xl border border-amber-200 bg-amber-50/90 flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
+            <div className="w-6 h-6 rounded-md bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5">
+              <AlertCircle className="w-3.5 h-3.5" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-poppins font-semibold text-xs text-amber-900">
+                  Urgent request: required within 2 hours.
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 bg-amber-200/80 text-amber-800 rounded font-bold uppercase tracking-wider">
+                  2-Hour Window
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                The arrival deadline is automatically populated for 2 hours from current time ({new Date(requiredBy).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).
+              </p>
+            </div>
+          </div>
+        )}
+
+        {priority === 'routine' && (
+          <div className="mt-3.5 p-3.5 rounded-xl border border-blue-200 bg-blue-50/90 flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
+            <div className="w-6 h-6 rounded-md bg-[#1E4C8A] text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-poppins font-semibold text-xs text-[#1E4C8A]">
+                  Routine request: standard fulfillment window (24 hours).
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 bg-blue-200/80 text-blue-800 rounded font-bold uppercase tracking-wider">
+                  24-Hour Queue
+                </span>
+              </div>
+              <p className="text-[11px] text-blue-800 mt-1 leading-relaxed">
+                Standard fulfillment window configured for scheduled cold-chain delivery ({new Date(requiredBy).toLocaleDateString([], { month: 'short', day: 'numeric' })}, {new Date(requiredBy).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).
+              </p>
+            </div>
+          </div>
+        )}
 
         {touched.priority && errors.priority && (
           <p className="text-xs text-rose-600 mt-1 flex items-center gap-1 font-inter">
@@ -491,129 +557,12 @@ export const RequestForm: React.FC<RequestFormProps> = ({
         )}
       </section>
 
-      {/* SECTION 3 — Request Details (Section 16) */}
-      <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 sm:p-6 shadow-card space-y-5">
-        <div className="border-b border-slate-100 pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#C1272D] block mb-0.5">
-                Section 03
-              </span>
-              <h3 className="font-poppins font-semibold text-lg text-[#0F172A]">
-                When & why do you need it?
-              </h3>
-            </div>
-            <span className="text-xs font-mono text-slate-400">Clinical Verification</span>
-          </div>
-          <p className="text-xs text-[#64748B] mt-0.5">
-            Provide the required arrival window and clinical reason for the requisition.
-          </p>
-        </div>
-
-        {/* Required By Picker (Date + Time) */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="required-by-datetime" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
-              Required By (Date & Time)
-            </label>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleTimePreset(2)}
-                className="text-[11px] font-mono text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
-              >
-                +2 hrs
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTimePreset(4)}
-                className="text-[11px] font-mono text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
-              >
-                +4 hrs
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTimePreset(8)}
-                className="text-[11px] font-mono text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
-              >
-                +8 hrs
-              </button>
-            </div>
-          </div>
-
-          <div className="relative max-w-sm">
-            <input
-              id="required-by-datetime"
-              type="datetime-local"
-              value={requiredBy}
-              onChange={(e) => {
-                setRequiredBy(e.target.value);
-                setIsDirty(true);
-                setTouched((prev) => ({ ...prev, requiredBy: true }));
-              }}
-              onBlur={() => handleBlur('requiredBy')}
-              className="w-full py-2.5 px-3 text-xs sm:text-sm font-mono text-[#0F172A] bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1E4C8A]"
-            />
-          </div>
-
-          {touched.requiredBy && errors.requiredBy && (
-            <p className="text-xs text-rose-600 mt-1.5 flex items-center gap-1 font-inter">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{errors.requiredBy}</span>
-            </p>
-          )}
-        </div>
-
-        {/* Clinical Reason Textarea */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="clinical-reason-textarea" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
-              Clinical / Operational Reason{' '}
-              {priority === 'routine' ? (
-                <span className="text-slate-400 font-normal lowercase">(optional for routine)</span>
-              ) : (
-                <span className="text-[#C1272D] font-medium">* (required for {priority})</span>
-              )}
-            </label>
-            <span
-              className={`text-xs font-mono ${
-                reason.length > 480 ? 'text-amber-600 font-semibold' : 'text-slate-400'
-              }`}
-            >
-              {reason.length} / 500
-            </span>
-          </div>
-
-          <textarea
-            id="clinical-reason-textarea"
-            rows={3}
-            maxLength={500}
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              setIsDirty(true);
-              setTouched((prev) => ({ ...prev, reason: true }));
-            }}
-            onBlur={() => handleBlur('reason')}
-            placeholder="Briefly describe why the blood is required (e.g. polytrauma protocol, scheduled bypass surgery, ICU stabilization)..."
-            className="w-full p-3 text-xs sm:text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1E4C8A] placeholder:text-slate-400 leading-relaxed font-inter"
-          />
-
-          {touched.reason && errors.reason && (
-            <p className="text-xs text-rose-600 mt-1 flex items-center gap-1 font-inter">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{errors.reason}</span>
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* SECTION 4 — Contact & Delivery Information (Section 17) */}
+      {/* SECTION 3 — Contact & Delivery Information */}
       <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 sm:p-6 shadow-card space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
             <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#C1272D] block mb-0.5">
-              Section 04
+              Section 03
             </span>
             <h3 className="font-poppins font-semibold text-lg text-[#0F172A]">
               Delivery Destination
