@@ -1,10 +1,10 @@
-# RaktSetu
+# Seva-Sathi
 
-> **Intelligent Blood Emergency Orchestration Platform**
+> **AI-Powered Centralized Real-Time Blood Inventory & Donor Engagement Platform**
 
-BloodLink AI is a real-time platform designed to coordinate **hospitals, blood banks, and verified donor networks** during blood emergencies.
+Seva-Sathi is a next-generation real-time platform designed to coordinate **hospitals, blood banks, and verified donor networks** during blood emergencies.
 
-Instead of simply helping users find a blood donor or check blood availability, BloodLink AI acts as an **intelligent orchestration layer** that determines how an emergency blood requirement can be fulfilled using available inventory first and donor mobilisation when a shortage remains.
+Instead of simply helping users find a blood donor or check blood availability, Seva-Sathi acts as an **intelligent orchestration layer** that determines how an emergency blood requirement can be fulfilled using available inventory first and donor mobilisation when a shortage remains.
 
 ---
 
